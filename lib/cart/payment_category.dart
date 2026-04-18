@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:smm_power/cart/order_successfully.dart';
 import 'package:smm_power/navigation_source.dart';
+import 'package:dotted_line/dotted_line.dart';
 
 const Color kPrimary = Color(0xFF283897);
 const Color kYellow  = Color(0xFFF4E219);
@@ -11,11 +12,17 @@ enum PayMethod { upi, card, cod }
 
 class Payment_Category extends StatefulWidget {
   final double totalAmount;
+  final double mrpTotal;
+  final double discount;
+  final double fees;
   final NavigationSource source;
 
   const Payment_Category({
     super.key,
     required this.totalAmount,
+    required this.mrpTotal,
+    required this.discount,
+    required this.fees,
     required this.source,
   });
 
@@ -47,7 +54,7 @@ class _Payment_CategoryState extends State<Payment_Category> {
       builder: (context) {
         return Container(
           width: double.infinity,
-          height: sh * 0.308, // ~250
+          height: sh * 0.300,
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.only(
@@ -71,14 +78,14 @@ class _Payment_CategoryState extends State<Payment_Category> {
                 ),
                 SizedBox(height: sh * 0.012),
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Text(
                         'Pay via UPI or Cash\nWhen you receive\nyour order',
                         style: TextStyle(
                           fontSize: sw * 0.037,
-                          color: const Color(0xFF1C36CE),
+                          color: const Color(0xFF4256D3),
                           fontWeight: FontWeight.w400,
                         ),
                       ),
@@ -89,7 +96,7 @@ class _Payment_CategoryState extends State<Payment_Category> {
                       child: Image.asset(
                         'assets/cart/confirm.png',
                         width: sw * 0.480,
-                        height: sh * 0.148,
+                        height: sh * 0.145,
                         fit: BoxFit.contain,
                         errorBuilder: (_, __, ___) =>
                             SizedBox(width: sw * 0.480, height: sh * 0.148),
@@ -98,7 +105,7 @@ class _Payment_CategoryState extends State<Payment_Category> {
                   ],
                 ),
                 SizedBox(height: sh * 0.002),
-                Container(height: 1.5, color: kPrimary),
+                Container(height: 1.5, color: Color(0xFF4256D3)),
                 const Spacer(),
                 Row(
                   children: [
@@ -112,11 +119,11 @@ class _Payment_CategoryState extends State<Payment_Category> {
                         ),
                         child: Text(
                           'Cancel',
-                          style: TextStyle(color: const Color(0xff4256D3), fontSize: sw * 0.037, fontWeight: FontWeight.w400),
+                          style: TextStyle(color: const Color(0xff4256D3), fontSize: sw * 0.04, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ),
-                    SizedBox(width: sw * 0.027),
+                    SizedBox(width: sw * 0.03),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
@@ -129,14 +136,14 @@ class _Payment_CategoryState extends State<Payment_Category> {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: kYellow,
+                          backgroundColor: Color(0xFFF4E219),
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           padding: EdgeInsets.symmetric(vertical: sh * 0.012),
                         ),
                         child: Text(
                           'Confirm Order',
-                          style: TextStyle(fontWeight: FontWeight.w400, fontSize: sw * 0.037),
+                          style: TextStyle(fontWeight: FontWeight.w500, fontSize: sw * 0.04),
                         ),
                       ),
                     ),
@@ -167,7 +174,7 @@ class _Payment_CategoryState extends State<Payment_Category> {
               children: [
                 SizedBox(height: sh * 0.012),
                 _buildStepper(sw, sh),
-                SizedBox(height: sh * 0.037),
+                SizedBox(height: sh * 0.025),
                 _buildTotalBar(sw, sh),
                 SizedBox(height: sh * 0.022),
                 const Divider(),
@@ -227,21 +234,21 @@ class _Payment_CategoryState extends State<Payment_Category> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text('Step 3 of 3', style: TextStyle(fontSize: sw * 0.027, fontWeight: FontWeight.w400, color: const Color(0xFF555555))),
+        Text('Step 3 of 3', style: TextStyle(fontSize: sw * 0.03, fontWeight: FontWeight.w400, color: const Color(0xFF555555))),
         SizedBox(height: sh * 0.005),
-        Text('Payments', style: TextStyle(color: Colors.black, fontSize: sw * 0.037, fontWeight: FontWeight.w500)),
+        Text('Payments', style: TextStyle(color: Colors.black, fontSize: sw * 0.04, fontWeight: FontWeight.w500)),
       ],
     ),
     actions: [
       Container(
-        margin: EdgeInsets.only(right: sw * 0.032),
+        margin: EdgeInsets.only(right: sw * 0.05),
         padding: EdgeInsets.symmetric(horizontal: sw * 0.016, vertical: sh * 0.005),
         decoration: BoxDecoration(color: const Color(0xffEDE4E4), borderRadius: BorderRadius.circular(6)),
         child: Row(
           children: [
             Icon(Icons.lock_outline, size: sw * 0.027, color: const Color(0XFF555555)),
             SizedBox(width: sw * 0.011),
-            Text('100% Secure', style: TextStyle(color: const Color(0XFF555555), fontSize: sw * 0.027, fontWeight: FontWeight.w400)),
+            Text('100% Secure', style: TextStyle(color: const Color(0XFF555555), fontSize: sw * 0.03, fontWeight: FontWeight.w400)),
           ],
         ),
       ),
@@ -249,46 +256,52 @@ class _Payment_CategoryState extends State<Payment_Category> {
     flexibleSpace: Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), offset: const Offset(0, 2), blurRadius: 4)],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), offset: const Offset(0, 6), blurRadius: 4)],
       ),
     ),
   );
 
-  // ── STEPPER ───────────────────────────────────────
   Widget _buildStepper(double sw, double sh) {
     return Center(
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: sh * 0.015),
         child: SizedBox(
-          width: sw * 0.693,
+          width: sw * 0.7,
           child: Column(
             children: [
               Row(
                 children: [
-                  // Step 1 - done
                   Container(
-                    width: sw * 0.059, height: sw * 0.059,
-                    decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFAAB5FF)),
+                    width: sw * 0.07,
+                    height: sw * 0.07,
+                    decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFFAAB5FF),
+                        border: Border.all(color: Color(0xFF4256D3), width: 2)),
                     child: Icon(Icons.check, size: sw * 0.037, color: const Color(0xff4256D3)),
                   ),
                   Expanded(child: Container(height: 1.5, color: const Color(0xff4256D3))),
-                  // Step 2 - done
                   Container(
-                    width: sw * 0.059, height: sw * 0.059,
-                    decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFAAB5FF)),
+                    width: sw * 0.07,
+                    height: sw * 0.07,
+                    decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFFAAB5FF),
+                        border: Border.all(color: Color(0xFF4256D3), width: 2)),
                     child: Icon(Icons.check, size: sw * 0.037, color: const Color(0xff4256D3)),
                   ),
                   Expanded(child: Container(height: 1.5, color: const Color(0xFF4256D3))),
-                  // Step 3 - active
                   Container(
-                    width: sw * 0.059, height: sw * 0.059,
+                    width: sw * 0.07,
+                    height: sw * 0.07,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF4256D3),
-                      border: Border.all(color: Colors.grey),
+                      color: Color(0xFF4256D3),
+                      border: Border.all(color: Color(0xFF555555), width: 2),
                     ),
                     child: Center(
-                      child: Text('3', style: TextStyle(color: Colors.white, fontSize: sw * 0.032, fontWeight: FontWeight.w600)),
+                      child: Text('3',
+                          style: TextStyle(color: Color(0xFFFFFFFF), fontSize: sw * 0.033, fontWeight: FontWeight.w400)),
                     ),
                   ),
                 ],
@@ -297,9 +310,9 @@ class _Payment_CategoryState extends State<Payment_Category> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Address', style: TextStyle(fontSize: sw * 0.027, fontWeight: FontWeight.w500, color: const Color(0xff4256D3))),
-                  Text('Order Summary', style: TextStyle(fontSize: sw * 0.027, fontWeight: FontWeight.w500, color: const Color(0xff4256D3))),
-                  Text('Payment', style: TextStyle(fontSize: sw * 0.027, fontWeight: FontWeight.w500, color: const Color(0xff555555))),
+                  Text('Address', style: TextStyle(fontSize: sw * 0.035, fontWeight: FontWeight.w500, color: const Color(0xff4256D3))),
+                  Text('Order Summary', style: TextStyle(fontSize: sw * 0.035, fontWeight: FontWeight.w500, color: const Color(0xff555555))),
+                  Text('Payment', style: TextStyle(fontSize: sw * 0.035, fontWeight: FontWeight.w500, color: const Color(0xff555555))),
                 ],
               ),
             ],
@@ -309,7 +322,7 @@ class _Payment_CategoryState extends State<Payment_Category> {
     );
   }
 
-  // ── TOTAL BAR ─────────────────────────────────────
+  // ── TOTAL BAR with exact _buildBill alignment ─────
   Widget _buildTotalBar(double sw, double sh) {
     return Center(
       child: Column(
@@ -317,8 +330,8 @@ class _Payment_CategoryState extends State<Payment_Category> {
           InkWell(
             onTap: () => setState(() => _totalExpanded = !_totalExpanded),
             child: Container(
-              width: sw * 0.800, // ~300
-              height: sh * 0.062, // ~50
+              width: sw * 0.800,
+              height: sh * 0.062,
               padding: EdgeInsets.symmetric(horizontal: sw * 0.027),
               decoration: BoxDecoration(
                 color: const Color(0XFFDCE1FF),
@@ -326,49 +339,86 @@ class _Payment_CategoryState extends State<Payment_Category> {
                 border: Border.all(color: const Color(0XFFDCE1FF)),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Row(
                     children: [
                       Text(
                         'Total Amount',
-                        style: TextStyle(fontSize: sw * 0.043, fontWeight: FontWeight.w600, color: const Color(0xFF1C36CE)),
+                        style: TextStyle(fontSize: sw * 0.04, fontWeight: FontWeight.w600, color: const Color(0xFF1C36CE)),
                       ),
-                      SizedBox(width: sw * 0.005),
+                      SizedBox(width: sw * 0.02),
                       Icon(
                         _totalExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                        size: sw * 0.053,
+                        size: sw * 0.05,
                         color: const Color(0xFF1C36CE),
                       ),
                     ],
                   ),
                   Text(
                     '₹${widget.totalAmount.toInt()}',
-                    style: TextStyle(fontSize: sw * 0.043, fontWeight: FontWeight.w600, color: const Color(0xFF1C36CE)),
+                    style: TextStyle(fontSize: sw * 0.04, fontWeight: FontWeight.w600, color: const Color(0xFF1C36CE)),
                   ),
                 ],
               ),
             ),
           ),
+
+          // ── Expanded breakdown — same layout as _buildBill ──
           if (_totalExpanded)
-            Padding(
-              padding: EdgeInsets.only(top: sh * 0.010),
-              child: Container(
-                width: sw * 0.747,
-                padding: EdgeInsets.all(sw * 0.021),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                child: Column(
-                  children: [
-                    _breakdownRow('MRP', '₹5000', Colors.black, sw),
-                    SizedBox(height: sh * 0.004),
-                    _breakdownRow('Fees', '₹7', Colors.black, sw),
-                    SizedBox(height: sh * 0.004),
-                    _breakdownRow('Discount', '-₹2000', kGreen, sw),
-                    SizedBox(height: sh * 0.004),
-                    _breakdownRow('Total Amount', '₹5007', Colors.black, sw),
-                  ],
-                ),
+            Container(
+              width: sw * 0.800,
+              margin: EdgeInsets.only(top: sh * 0.015),
+              padding: EdgeInsets.all(sw * 0.035),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF555555)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // MRP
+                  Row(children: [
+                    Text('MRP', style: TextStyle(fontSize: sw * 0.04)),
+                    const Spacer(),
+                    Text('₹${widget.mrpTotal.toInt()}', style: TextStyle(fontSize: sw * 0.04)),
+                  ]),
+                  SizedBox(height: sh * 0.012),
+                  DottedLine(dashLength: 4, dashGapLength: 3, lineThickness: 1, dashColor: Color(0xFF555555)),
+                  SizedBox(height: sh * 0.012),
+
+                  // Fees
+                  Row(children: [
+                    Text('Fees', style: TextStyle(fontSize: sw * 0.04)),
+                    const Spacer(),
+                    Text('₹${widget.fees.toInt()}', style: TextStyle(fontSize: sw * 0.04)),
+                  ]),
+                  SizedBox(height: sh * 0.012),
+                  DottedLine(dashLength: 4, dashGapLength: 3, lineThickness: 1, dashColor: Color(0xFF555555)),
+                  SizedBox(height: sh * 0.012),
+
+                  // Discount
+                  Row(children: [
+                    Text('Discount', style: TextStyle(fontSize: sw * 0.04)),
+                    const Spacer(),
+                    Text(
+                      '-₹${widget.discount.toInt()}',
+                      style: TextStyle(fontSize: sw * 0.04, color: Color(0xFF41A900), fontWeight: FontWeight.w600),
+                    ),
+                  ]),
+                  SizedBox(height: sh * 0.012),
+                  DottedLine(dashLength: 4, dashGapLength: 3, lineThickness: 1, dashColor: Color(0xFF555555)),
+                  SizedBox(height: sh * 0.012),
+
+                  // Total Amount
+                  Row(children: [
+                    Text('Total Amount', style: TextStyle(fontWeight: FontWeight.w600, fontSize: sw * 0.04)),
+                    const Spacer(),
+                    Text('₹${widget.totalAmount.toInt()}', style: TextStyle(fontSize: sw * 0.04, fontWeight: FontWeight.w600)),
+                  ]),
+                ],
               ),
             ),
         ],
@@ -376,17 +426,6 @@ class _Payment_CategoryState extends State<Payment_Category> {
     );
   }
 
-  Widget _breakdownRow(String label, String val, Color valColor, double sw) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(fontSize: sw * 0.035, color: const Color(0xFF555555))),
-        Text(val, style: TextStyle(fontSize: sw * 0.035, color: valColor, fontWeight: FontWeight.w500)),
-      ],
-    );
-  }
-
-  // ── PAY SECTION ───────────────────────────────────
   Widget _buildPaySection({
     required PayMethod method,
     required IconData icon,
@@ -416,13 +455,13 @@ class _Payment_CategoryState extends State<Payment_Category> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title, style: TextStyle(fontSize: sw * 0.037, fontWeight: FontWeight.w400, color: const Color(0xFF000000))),
+                        Text(title, style: TextStyle(fontSize: sw * 0.04, fontWeight: FontWeight.w500, color: const Color(0xFF000000))),
                         if (!isOpen && subtitle.isNotEmpty)
-                          Text(subtitle, maxLines: 1, style: TextStyle(fontSize: sw * 0.035, color: const Color(0xFF000000), fontWeight: FontWeight.w400)),
+                          Text(subtitle, maxLines: 1, style: TextStyle(fontSize: sw * 0.033, color: const Color(0xFF000000), fontWeight: FontWeight.w400)),
                         if (!isOpen && offerText != null)
                           Padding(
                             padding: EdgeInsets.only(top: sh * 0.002),
-                            child: Text(offerText, style: TextStyle(fontSize: sw * 0.029, color: const Color(0xff3C8E09), fontWeight: FontWeight.w500)),
+                            child: Text(offerText, style: TextStyle(fontSize: sw * 0.033, color: const Color(0xff3C8E09), fontWeight: FontWeight.w500)),
                           ),
                       ],
                     ),
@@ -430,7 +469,7 @@ class _Payment_CategoryState extends State<Payment_Category> {
                   Icon(
                     isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                     size: sw * 0.059,
-                    color: const Color(0xFF888888),
+                    color: const Color(0xFF000000),
                   ),
                 ],
               ),
@@ -453,27 +492,27 @@ class _Payment_CategoryState extends State<Payment_Category> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Icon(Icons.radio_button_checked_outlined, size: sw * 0.053, color: kPrimary),
+          Icon(Icons.radio_button_checked_outlined, size: sw * 0.053, color: Color(0xFF4256D3)),
           SizedBox(width: sw * 0.027),
-          Text('Google Pay', style: TextStyle(fontSize: sw * 0.035, fontWeight: FontWeight.w500, color: const Color(0xFF1A1A1A))),
+          Text('Google Pay', style: TextStyle(fontSize: sw * 0.04, fontWeight: FontWeight.w500, color: const Color(0xFF1A1A1A))),
         ]),
         SizedBox(height: sh * 0.007),
         Row(children: [
           SizedBox(width: sw * 0.080),
-          Icon(Icons.check, size: sw * 0.037, color: kGreen),
+          Icon(Icons.check, size: sw * 0.037, color: Color(0xFF3C8E09),),
           SizedBox(width: sw * 0.011),
           Text(
             '₹35 discount applied',
             style: TextStyle(
-              fontSize: sw * 0.029,
-              color: kGreen,
+              fontSize: sw * 0.035,
+              color: Color(0xFF3C8E09),
               fontWeight: FontWeight.w500,
               decoration: TextDecoration.underline,
-              decorationColor: kGreen,
+              decorationColor: Color(0xFF3C8E09),
             ),
           ),
         ]),
-        SizedBox(height: sh * 0.017),
+        SizedBox(height: sh * 0.02),
         _payButton('Pay ₹${widget.totalAmount.toInt()}', () {}, sw, sh),
       ],
     );
@@ -486,19 +525,19 @@ class _Payment_CategoryState extends State<Payment_Category> {
         RichText(
           text: TextSpan(
             children: [
-              TextSpan(text: 'Note: ', style: TextStyle(fontSize: sw * 0.037, color: Colors.black, fontWeight: FontWeight.w400)),
+              TextSpan(text: 'Note: ', style: TextStyle(fontSize: sw * 0.037, color: Colors.black, fontWeight: FontWeight.w400, fontFamily: 'Poppins')),
               TextSpan(
                 text: 'Please ensure your card can be used for online transaction. ',
-                style: TextStyle(fontSize: sw * 0.032, color: const Color(0xFF555555), fontWeight: FontWeight.w400),
+                style: TextStyle(fontSize: sw * 0.033, color: const Color(0xFF555555), fontWeight: FontWeight.w400, fontFamily: 'Poppins'),
               ),
               TextSpan(
                 text: 'Learn more',
-                style: TextStyle(fontSize: sw * 0.032, color: const Color(0xFF1B2A89), fontWeight: FontWeight.w400),
+                style: TextStyle(fontSize: sw * 0.033, color: const Color(0xFF1B2A89), fontWeight: FontWeight.w400, fontFamily: 'Poppins'),
               ),
             ],
           ),
         ),
-        SizedBox(height: sh * 0.007),
+        SizedBox(height: sh * 0.015),
         Container(
           padding: EdgeInsets.all(sw * 0.032),
           decoration: BoxDecoration(
@@ -545,8 +584,8 @@ class _Payment_CategoryState extends State<Payment_Category> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: sw * 0.032, fontWeight: FontWeight.w500, color: const Color(0xFF444444))),
-        SizedBox(height: sh * 0.007),
+        Text(label, style: TextStyle(fontSize: sw * 0.037, fontWeight: FontWeight.w500, color: const Color(0xFF000000))),
+        SizedBox(height: sh * 0.01),
         TextField(
           controller: ctrl,
           keyboardType: type,
@@ -560,11 +599,11 @@ class _Payment_CategoryState extends State<Payment_Category> {
             contentPadding: EdgeInsets.symmetric(horizontal: sw * 0.032, vertical: sh * 0.015),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF555555)),
+              borderSide: const BorderSide(color: Color(0xFF999999)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: kPrimary, width: 1.5),
+              borderSide: const BorderSide(color: Color(0xFF4256D3), width: 1.5),
             ),
             filled: true,
             fillColor: const Color(0XFFF1F8E9),
@@ -580,7 +619,7 @@ class _Payment_CategoryState extends State<Payment_Category> {
       children: [
         Text(
           'Due to handling costs, a nominal fee of ₹10 will be charged for orders placed using this option. Avoid this fee by paying online now.',
-          style: TextStyle(fontSize: sw * 0.032, color: const Color(0xFF555555), height: 1.5),
+          style: TextStyle(fontSize: sw * 0.037, color: const Color(0xFF555555), height: 1.6),
         ),
         SizedBox(height: sh * 0.017),
         _payButton('Pay ₹${widget.totalAmount.toInt()}', () => _showCodBottomSheet(sw, sh), sw, sh),
@@ -590,17 +629,17 @@ class _Payment_CategoryState extends State<Payment_Category> {
 
   Widget _payButton(String label, VoidCallback onTap, double sw, double sh) {
     return SizedBox(
-      width: sw * 0.800,
-      height: sh * 0.049, // ~40
+      width: double.infinity,
+      height: sh * 0.05,
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xffF4E219),
-          foregroundColor: const Color(0xFF1A1A1A),
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          foregroundColor: const Color(0xFF000000),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
           elevation: 0,
         ),
-        child: Text(label, style: TextStyle(fontSize: sw * 0.037, fontWeight: FontWeight.w500)),
+        child: Text(label, style: TextStyle(fontSize: sw * 0.04, fontWeight: FontWeight.w500)),
       ),
     );
   }

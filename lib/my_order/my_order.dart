@@ -2,9 +2,9 @@ import 'package:smm_power/my_order/review_product.dart';
 import 'package:flutter/material.dart';
 
 const Color kPrimary = Color(0xFF4256D3);
-const Color kGreen = Color(0xFF2E7D32);
+const Color kGreen = Color(0xFF007C29);
 const Color kRed = Color(0xFFD32F2F);
-const Color kYellow = Color(0xFFFFCC00);
+const Color kYellow = Color(0xFFEE9300);
 
 // ─────────────────────────────────────────
 // MODEL
@@ -136,24 +136,26 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFFFFFFF),
       appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          // ── BANNER ──
-          _buildBanner(),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            _buildBanner(),
 
-          // ── TAB BAR ──
-          _buildTabBar(),
+            const SizedBox(height: 10),
+            _buildTabBar(),
 
-          // ── ORDER LIST ──
-          Expanded(
-            child: _filteredOrders.isEmpty
-                ? const Center(
+            _filteredOrders.isEmpty
+                ? const Padding(
+              padding: EdgeInsets.only(top: 50),
               child: Text(
                 'No orders found',
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
             )
                 : ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(
                   horizontal: 16, vertical: 12),
               itemCount: _filteredOrders.length,
@@ -161,8 +163,8 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                 return _buildOrderCard(_filteredOrders[index]);
               },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -176,15 +178,15 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
       elevation: 0,
       leading: IconButton(
         onPressed: () => Navigator.pop(context),
-        icon: const Icon(Icons.arrow_back_ios_new,
-            color: Color(0xFF4256D3), size: 15),
+        icon: const Icon(Icons.chevron_left,
+            color: Color(0xFF4256D3)),
       ),
       titleSpacing: 0,
       title: const Text(
         'My Orders',
         style: TextStyle(
           color: Color(0xFF4256D3),
-          fontSize: 14,
+          fontSize: 18,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -201,7 +203,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.15),
-              offset: const Offset(0, 2),
+              offset: const Offset(0, 4),
               blurRadius: 4,
             ),
           ],
@@ -294,7 +296,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
   // ─────────────────────────────────────────
   Widget _buildOrderCard(OrderModel order) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 15),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -333,8 +335,6 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                 ),
 
                 const SizedBox(width: 12),
-
-                // Info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,8 +345,8 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                             child: Text(
                               order.productName,
                               style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                                 color: Color(0xFF000000),
                               ),
                             ),
@@ -358,25 +358,26 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                       Text(
                         '${order.id} · ${order.date}',
                         style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: 13,
                           color: Color(0xFF000000),
                         ),
                       ),
                       const SizedBox(height: 5),
-                      Text(
-                        order.subtitle,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFF000000),
+                      if (order.status != OrderStatus.delivered)
+                        Text(
+                          order.subtitle,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF000000),
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 6),
 
                       if (order.status == OrderStatus.delivered)
                         Text(
                           '₹${order.totalPaid.toStringAsFixed(0)}',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 14,
                             fontWeight: FontWeight.w400,
                             color: Color(0xFF000000),
                           ),
@@ -395,7 +396,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
           // ── FREE INSTALLATION BANNER ──
           if (order.hasFreeInstallation)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
               decoration: BoxDecoration(
                 color: const Color(0xFF568B3E),
                 borderRadius: BorderRadius.circular(0),
@@ -405,7 +406,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                   Text(
                     'Free professional installation included — schedule after delivery',
                     style: TextStyle(
-                      fontSize: 8,
+                      fontSize: 10,
                       color: Colors.white,
                       fontWeight: FontWeight.w400,
                     ),
@@ -415,12 +416,17 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
               ),
             ),
 
-          const SizedBox(height: 10),
+          if (order.status != OrderStatus.active)
+            const Divider(
+              height: 1,
+              thickness: 1,
+              color: Color(0xFFDADADA),
+            ),
 
-          // ── FOOTER ──
+          const SizedBox(height: 10),
           _buildCardFooter(order),
 
-          const SizedBox(height: 4),
+          const SizedBox(height: 7),
         ],
       ),
     );
@@ -448,7 +454,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
         break;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(10),
@@ -456,8 +462,8 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w400,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
           color: text,
         ),
       ),
@@ -469,7 +475,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
     final completed = order.trackingSteps;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: List.generate(steps.length, (i) {
@@ -502,7 +508,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
             child: Column(
               children: [
                 SizedBox(
-                  height: 22,
+                  height: 25,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -516,7 +522,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                                   : leftLineColor,
                             ),
                           ),
-                          // Placeholder gap = circle width so line doesn't go under circle
+
                           const SizedBox(width: 22),
                           // RIGHT line segment
                           Expanded(
@@ -537,7 +543,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                           shape: BoxShape.circle,
                           color: circleColor,
                           border: Border.all(
-                            color: borderColor,
+                            color: Color(0xFFFFFFFF),
                             width: 1.5,
                           ),
                         ),
@@ -558,7 +564,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   style: TextStyle(
-                    fontSize: 9,
+                    fontSize: 10,
                     height: 1.2,
                     color: Colors.black,
                     fontWeight:
@@ -593,6 +599,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  SizedBox(height: 5,),
                   Text(
                     '₹${order.totalPaid.toStringAsFixed(0)}',
                     style: const TextStyle(
@@ -620,7 +627,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                 child: const Text(
                   'Track Shipment',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: Colors.black,
                     fontWeight: FontWeight.w500,
                   ),
@@ -630,10 +637,9 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
           ),
         );
 
-    // ───────── DELIVERED ─────────
       case OrderStatus.delivered:
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 4),
           child: Row(
             children: [
               ElevatedButton(
@@ -644,7 +650,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                   ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
-                    vertical: 5,
+                    vertical: 8,
                   ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -667,13 +673,13 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                 child: const Text(
                   'Write Review',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: Colors.black,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 15),
 
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
@@ -683,7 +689,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                   ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 15,
-                    vertical: 6,
+                    vertical: 8,
                   ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -698,7 +704,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                     Text(
                       'Invoice',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: Colors.black,
                       ),
                     ),
@@ -706,7 +712,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                 ),
               ),
 
-              const SizedBox(width: 6),
+              const SizedBox(width: 15),
 
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
@@ -716,7 +722,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                   ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 15,
-                    vertical: 6,
+                    vertical: 8,
                   ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -725,7 +731,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                 child: const Text(
                   'Reorder',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: Colors.black,
                   ),
                 ),
@@ -752,6 +758,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                       color: Colors.black,
                     ),
                   ),
+                  SizedBox(height: 5,),
                   Text(
                     '₹${order.totalPaid.toStringAsFixed(0)}',
                     style: const TextStyle(
@@ -764,13 +771,13 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
               const Spacer(),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFAAAAAA)),
+                  side: const BorderSide(color: Color(0xFFDDDDDD)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
                   ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 15,
-                    vertical: 6,
+                    vertical: 8,
                   ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -779,7 +786,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                 child: const Text(
                   'Reorder',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: Colors.black,
                   ),
                 ),

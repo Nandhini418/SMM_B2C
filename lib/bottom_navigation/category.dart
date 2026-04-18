@@ -10,6 +10,114 @@ class CategoryScreen extends StatefulWidget {
 
 class _CategoryScreenState extends State<CategoryScreen> {
   int _selectedSideIndex = 0;
+  int _selectedSortIndex = 0;
+
+  void _showSortBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+
+                  // 🔹 Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Sort By",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // 🔹 Options
+                  _buildSortTile("Relevance", 0, setModalState),
+                  _buildSortTile("Discount", 1, setModalState),
+                  _buildSortTile("Price (lowest first)", 2, setModalState),
+                  _buildSortTile("Whats New", 3, setModalState),
+                  _buildSortTile("Price (Highest first)", 4, setModalState),
+                  _buildSortTile("Ratings", 5, setModalState),
+
+                  const SizedBox(height: 10),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSortTile(String title, int index, Function setModalState) {
+    return InkWell(
+      onTap: () {
+        setModalState(() {
+          _selectedSortIndex = index;
+        });
+
+        Navigator.pop(context);
+
+        // 👉 Apply sorting logic here if needed
+        print("Selected: $title");
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+
+            // 🔘 Custom radio circle
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.black, width: 1.5),
+              ),
+              child: _selectedSortIndex == index
+                  ? Center(
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black,
+                  ),
+                ),
+              )
+                  : null,
+            ),
+
+            const SizedBox(width: 12),
+
+            Text(
+              title,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   final List<_SideCategory> _sideCategories = const [
     _SideCategory(label: 'POPULAR', image: 'assets/category/star.png', color: Color(0xFF2E7D32)),
@@ -33,6 +141,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
             _ContentItem(label: 'SOLAR WIND\nHYBRID', image: 'assets/category/solar_hybrid.png'),
             _ContentItem(label: 'SOLAR SERIES\nPRODUCTS', image: 'assets/category/solar_series.png'),
             _ContentItem(label: 'SOLAR POST\nTOP LIGHT', image: 'assets/home/solar_post.png'),
+            _ContentItem(label: 'VIEW ALL', image: 'assets/category/view.jpg'),
           ],
         ),
         _ContentSection(
@@ -155,7 +264,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
             boxShadow: [
               BoxShadow(
                 color: Color(0x1A000000),
-                offset: Offset(0, 2),
+                offset: Offset(0, 4),
                 blurRadius: 6,
                 spreadRadius: 0,
               ),
@@ -187,10 +296,27 @@ class _CategoryScreenState extends State<CategoryScreen> {
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
-                    onPressed: () {},
-                    icon: Icon(Icons.search, size: sw * 0.064),
-                  ),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {},
+                        child: Icon(Icons.search, size: sw * 0.06, color: Colors.black,),
+                      ),
+                      SizedBox(width: sw * 0.03),
+
+                      GestureDetector(
+                        onTap: () {},
+                        child: Icon(Icons.favorite_border, size: sw * 0.06, color: Colors.black,),
+                      ),
+                      SizedBox(width: sw * 0.03),
+
+                      GestureDetector(
+                        onTap: () {},
+                        child: Icon(Icons.shopping_cart_outlined, size: sw * 0.06, color: Colors.black,),
+                      ),
+                      SizedBox(width: sw * 0.02),
+                    ],
+                  )
                 ],
               ),
             ),
@@ -305,37 +431,82 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
     return Container(
       color: const Color(0xFFF5F5F5),
-      child: ListView.builder(
+      child: ListView(
         padding: EdgeInsets.all(sw * 0.032),
-        itemCount: content.sections.length,
-        itemBuilder: (ctx, si) {
-          final section = content.sections[si];
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          // ✅ SORT BY (ONLY ONCE AT TOP)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              SizedBox(height: sh * 0.012),
-              Row(
-                children: [
-                  Text(
-                    section.title,
-                    style: TextStyle(
-                      fontSize: sw * 0.037,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF1A1A1A),
-                    ),
+              GestureDetector(
+                onTap: () => _showSortBottomSheet(context),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: sw * 0.025,
+                    vertical: sh * 0.006,
                   ),
-                  SizedBox(width: sw * 0.021),
-                  Expanded(
-                    child: Container(height: 1, color: const Color(0xFF4256D3)),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFF4256D3)),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                ],
+                  child: Row(
+                    children: [
+                      Icon(Icons.swap_vert,
+                          size: sw * 0.045, color: Color(0xFF4256D3)),
+                      SizedBox(width: sw * 0.01),
+                      Text(
+                        "Sort By",
+                        style: TextStyle(
+                          fontSize: sw * 0.035,
+                          color: const Color(0xFF4256D3),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              SizedBox(height: sh * 0.017),
-              _buildItemGrid(section.items, sw, sh),
-              SizedBox(height: sh * 0.025),
             ],
-          );
-        },
+          ),
+
+          SizedBox(height: sh * 0.005),
+
+          // ❗ Sections (loop manually instead of builder)
+          ...content.sections.map((section) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: sh * 0.012),
+
+                // Section Title
+                Row(
+                  children: [
+                    Text(
+                      section.title,
+                      style: TextStyle(
+                        fontSize: sw * 0.037,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    SizedBox(width: sw * 0.021),
+                    Expanded(
+                      child: Container(
+                          height: 1, color: const Color(0xFF868282)),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: sh * 0.017),
+
+                _buildItemGrid(section.items, sw, sh),
+
+                SizedBox(height: sh * 0.025),
+              ],
+            );
+          }).toList(),
+        ],
       ),
     );
   }
@@ -365,11 +536,13 @@ class _ContentItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isViewAll = item.label.contains("VIEW");
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Container(
-          width: sw * 0.173,  // ~65
+          width: sw * 0.173,
           height: sw * 0.173,
           decoration: BoxDecoration(
             color: Colors.white,
@@ -382,21 +555,38 @@ class _ContentItemCard extends StatelessWidget {
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: ClipOval(
-              child: Image.asset(item.image, fit: BoxFit.contain),
+          child: Center(
+            child: isViewAll
+            // 🔥 SHOW ICON
+                ? Icon(
+              Icons.arrow_forward, // you can change icon
+              size: sw * 0.1,
+              color: const Color(0xFF4256D3),
+            )
+            // 🔥 SHOW IMAGE
+                : Padding(
+              padding: const EdgeInsets.all(4),
+              child: ClipOval(
+                child: Image.asset(
+                  item.image,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
           ),
         ),
+
         SizedBox(height: sh * 0.007),
+
         Text(
           item.label,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: sw * 0.027,
-            fontWeight: FontWeight.w400,
-            color: const Color(0xFF000000),
+            fontWeight: isViewAll ? FontWeight.w600 : FontWeight.w500,
+            color: isViewAll
+                ? const Color(0xFF4256D3)
+                : const Color(0xFF000000),
           ),
         ),
       ],

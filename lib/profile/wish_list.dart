@@ -42,7 +42,7 @@ class _WishListScreenState extends State<WishListScreen> {
             boxShadow: [
               BoxShadow(
                 color: Color(0x1A000000),
-                offset: Offset(0, 2),
+                offset: Offset(0, 6),
                 blurRadius: 6,
                 spreadRadius: 0,
               ),
@@ -54,14 +54,14 @@ class _WishListScreenState extends State<WishListScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.chevron_left, color: Color(0xFF1565C0)),
+                    icon: const Icon(Icons.chevron_left, color: Color(0xFF4256D3)),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   const SizedBox(width: 4),
                   const Text(
                     'Wishlist',
                     style: TextStyle(
-                      color: Color(0xFF1565C0),
+                      color: Color(0xFF4256D3),
                       fontSize: 18,
                       fontWeight: FontWeight.w500,
                     ),

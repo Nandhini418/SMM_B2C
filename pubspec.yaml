@@ -31,7 +31,13 @@ dependencies:
   flutter:
     sdk: flutter
   dotted_line: ^3.2.2
-  image_picker: ^1.1.2
+  image_picker: ^1.0.7
+  permission_handler: ^11.3.1
+  geolocator: ^13.0.2
+  geocoding: ^3.0.0
+  google_maps_flutter: ^2.9.0
+  app_settings: ^5.1.1
+  shared_preferences: ^2.3.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -79,6 +85,17 @@ flutter:
       fonts:
         - asset: assets/fonts/Prata-Regular.ttf
 
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter_24pt-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Inter_24pt-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter_24pt-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter_24pt-Regular.ttf
+          weight: 400
+
   assets:
     - assets/images/
     - assets/home/
@@ -88,6 +105,8 @@ flutter:
     - assets/login/
     - assets/items/
     - assets/my_order/
+    - assets/support/
+    - assets/picture/
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

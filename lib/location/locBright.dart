@@ -1,8 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:smm_power/location/location_service.dart';
 
-class LocBright extends StatelessWidget {
-  const LocBright({super.key});
+class LocBright extends StatefulWidget {
+  final String? initialAddress;
+  const LocBright({super.key, this.initialAddress});
+
+  @override
+  State<LocBright> createState() => _LocBrightState();
+}
+
+class _LocBrightState extends State<LocBright> {
+  late String _currentAddress;
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentAddress = widget.initialAddress ?? 'Search by area , name , street.';
+    _searchController = TextEditingController(text: widget.initialAddress);
+  }
+
+  void _handleLocation() async {
+    await LocationService.handleLocationAction(context, (address) {
+      setState(() {
+        _currentAddress = address;
+        _searchController.text = address;
+      });
+      // You can also show a success snackbar or navigate to next screen
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Location Found: $address')),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +67,7 @@ class LocBright extends StatelessWidget {
         children: [
           // Map Area
           Container(
-            height: 617, // Large height for the map area as requested
+            height: 617, 
             width: double.infinity,
             color: const Color(0xFFF0F2FF), // Light blue background
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
@@ -54,18 +84,19 @@ class LocBright extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.search, color: Colors.grey, size: 20),
-                      SizedBox(width: 10),
+                    children: [
+                      const Icon(Icons.search, color: Colors.grey, size: 20),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: TextField(
+                          controller: _searchController,
                           textAlignVertical: TextAlignVertical.center,
                           decoration: InputDecoration(
-                            hintText: 'Search by area , name , street.',
-                            hintStyle: TextStyle(color: Colors.grey, fontSize: 12),
+                            hintText: _currentAddress,
+                            hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
                             border: InputBorder.none,
                             isDense: true,
-                            contentPadding: EdgeInsets.only(bottom: 1),
+                            contentPadding: const EdgeInsets.only(bottom: 1),
                           ),
                         ),
                       ),
@@ -75,49 +106,52 @@ class LocBright extends StatelessWidget {
                 // Floating "Use current location" button
                 Align(
                   alignment: Alignment.bottomCenter,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 20),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.my_location, color: Color(0xFF4256D3), size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          'Use current location',
-                          style: TextStyle(
-                            color: Color(0xFF4256D3),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                  child: InkWell(
+                    onTap: _handleLocation,
+                    borderRadius: BorderRadius.circular(30),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.my_location, color: Color(0xFF4256D3), size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Use current location',
+                            style: TextStyle(
+                              color: Color(0xFF4256D3),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          // Bottom Info Section - NO LONGER FIXED, SCROLLS WITH THE REST
+          // Bottom Info Section
           Container(
             padding: const EdgeInsets.fromLTRB(30, 20, 30, 30),
             color: Colors.white,
             child: Column(
               children: [
-                // Map pin illustration - Replace 'assets/illustration.png' with your actual image path
                 Image.asset(
-                  'assets/illustration.png',
+                  'assets/illustration.png', 
                   height: 50,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
@@ -149,7 +183,7 @@ class LocBright extends StatelessWidget {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: _handleLocation,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4256D3),
                       shape: RoundedRectangleBorder(

@@ -15,7 +15,7 @@ class NotificationScreen extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: Color(0x1A000000),
-                offset: Offset(0, 2),
+                offset: Offset(0, 6),
                 blurRadius: 6,
                 spreadRadius: 0,
               ),
@@ -29,7 +29,7 @@ class NotificationScreen extends StatelessWidget {
                   IconButton(
                     icon: const Icon(
                       Icons.chevron_left,
-                      color: Color(0xFF1565C0),
+                      color: Color(0xFF4256D3),
                     ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
@@ -37,7 +37,7 @@ class NotificationScreen extends StatelessWidget {
                   const Text(
                     'Notification',
                     style: TextStyle(
-                      color: Color(0xFF1565C0),
+                      color: Color(0xFF4256D3),
                       fontSize: 18,
                       fontWeight: FontWeight.w500,
                     ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:smm_power/login/login.dart';
+import 'package:smm_power/login/splash_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -15,7 +15,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         fontFamily: 'Poppins',
       ),
-      home: const Login_Page(mobileNumber: ''),
+      home: const SplashScreen(),
     );
   }
 }

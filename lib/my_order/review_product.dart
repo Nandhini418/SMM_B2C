@@ -1,7 +1,7 @@
 import 'dart:io';
-import 'package:smm_power/my_order/my_order.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:smm_power/smm_support/support.dart';
 
 class ReviewStore {
   static List<Map<String, dynamic>> reviews = [];
@@ -55,9 +55,6 @@ class _ReviewProductPageState extends State<ReviewProductPage> {
     super.dispose();
   }
 
-  // ─────────────────────────────────────────
-  // PICK PHOTO
-  // ─────────────────────────────────────────
   Future<void> _pickPhoto() async {
     showModalBottomSheet(
       context: context,
@@ -157,35 +154,24 @@ class _ReviewProductPageState extends State<ReviewProductPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── HEADER TEXT ──
             _buildHeaderText(),
 
             const SizedBox(height: 16),
-
-            // ── PRODUCT CARD ──
             _buildProductCard(),
 
             const SizedBox(height: 18),
-
-            // ── ADD PHOTO / VIDEO ──
             _buildSectionLabel('Add Photo or Video'),
 
             const SizedBox(height: 10),
-
             _buildMediaButtons(),
 
             const SizedBox(height: 18),
-
-            // ── OVERALL RATING ──
             _buildSectionLabel('Overall rating'),
 
             const SizedBox(height: 12),
-
             _buildStarRating(),
 
             const SizedBox(height: 20),
-
-            // ── REVIEW TEXT FIELD ──
             _buildReviewTextField(),
 
             const SizedBox(height: 120),
@@ -193,8 +179,57 @@ class _ReviewProductPageState extends State<ReviewProductPage> {
         ),
       ),
 
-      // ── SUBMIT BUTTON ──
+      // ── BOTTOM AREA: Floating Help + Submit Button ──
       bottomNavigationBar: _buildSubmitButton(),
+
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 30, right: 10),
+        child: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const SmmSupportPage(),
+              ),
+            );
+          },
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE9ECFB),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.25),
+                  offset: const Offset(0, 4),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(
+                  Icons.support_agent,
+                  color: kPrimary,
+                  size: 18, // 👈 reduced
+                ),
+                SizedBox(height: 2),
+                Text(
+                  "Help",
+                  style: TextStyle(
+                    fontSize: 10, // 👈 very small to fit
+                    color: kPrimary,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -218,8 +253,8 @@ class _ReviewProductPageState extends State<ReviewProductPage> {
         'Review Product',
         style: TextStyle(
           color: kPrimary,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
         ),
       ),
       flexibleSpace: Container(
@@ -237,9 +272,6 @@ class _ReviewProductPageState extends State<ReviewProductPage> {
     );
   }
 
-  // ─────────────────────────────────────────
-  // HEADER TEXT
-  // ─────────────────────────────────────────
   Widget _buildHeaderText() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,9 +299,6 @@ class _ReviewProductPageState extends State<ReviewProductPage> {
     );
   }
 
-  // ─────────────────────────────────────────
-  // PRODUCT CARD
-  // ─────────────────────────────────────────
   Widget _buildProductCard() {
     return Container(
       width: double.infinity,
@@ -620,13 +649,10 @@ class _ReviewProductPageState extends State<ReviewProductPage> {
     );
   }
 
-  // ─────────────────────────────────────────
-  // SUBMIT BUTTON
-  // ─────────────────────────────────────────
   Widget _buildSubmitButton() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(30, 10, 30, 24),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
       child: SizedBox(
         width: double.infinity,
         height: 50,
@@ -636,17 +662,18 @@ class _ReviewProductPageState extends State<ReviewProductPage> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
-            elevation: 0,
           ),
           onPressed: () {
             if (_selectedRating == 0) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please select a rating'), backgroundColor: kPrimary),
+                const SnackBar(
+                  content: Text('Please select a rating'),
+                  backgroundColor: kPrimary,
+                ),
               );
               return;
             }
 
-            // ── SAVE TO STORE ──
             ReviewStore.reviews.insert(0, {
               'rating': _selectedRating,
               'review': _reviewController.text,
@@ -654,9 +681,8 @@ class _ReviewProductPageState extends State<ReviewProductPage> {
               'date': 'Just now',
             });
 
-            Navigator.pop(context, true); // just pop with true to signal success
+            Navigator.pop(context, true);
           },
-
           child: const Text(
             'Submit the Review',
             style: TextStyle(

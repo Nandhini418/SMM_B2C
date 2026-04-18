@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smm_power/category/product_details.dart';
 import 'package:smm_power/home_screen/notification.dart';
 import 'package:smm_power/home_screen/recommended.dart';
+import 'package:smm_power/saved_address/saved_address_screen.dart';
 import 'package:smm_power/wishlist_state.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -95,7 +96,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Spacer(),
                   _HeaderIcon(icon: Icons.qr_code_scanner_rounded, sw: sw, sh: sh),
                   SizedBox(width: sw * 0.027),
-                  _HeaderIcon(icon: Icons.location_on_outlined, sw: sw, sh: sh),
+                  GestureDetector(
+                    onTap: (){
+                      Navigator.push(context,
+                        MaterialPageRoute(builder: (context) => SavedAddressScreen())
+                      );
+                    },
+                    child: _HeaderIcon(icon: Icons.location_on_outlined, sw: sw, sh: sh),
+                  ),
                   SizedBox(width: sw * 0.027),
                   GestureDetector(
                     onTap: () {
@@ -240,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Text(
                 'Categories',
-                style: TextStyle(fontSize: sw * 0.045, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: sw * 0.045, fontWeight: FontWeight.w700),
               ),
               GestureDetector(
                 onTap: () {},
@@ -299,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
             'Best Selling',
             style: TextStyle(
               fontSize: sw * 0.045,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: const Color(0xFF1A1A1A),
             ),
           ),
@@ -365,8 +373,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(padding: EdgeInsets.symmetric(horizontal: sw * 0.043)),
-        SizedBox(height: sh * 0.017),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: sw * 0.05),
+          child: Text('You Might Also like ',
+            style: TextStyle(fontSize: sw * 0.045, fontWeight: FontWeight.w700),
+          ),
+        ),
+        SizedBox(height: sh * 0.02),
         SizedBox(
           height: sh * 0.210, // ~170
           child: ListView.builder(
