@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:async';
-import 'dart:math';
-
-import 'package:smm_power/bottom_navigation/bottom_nav.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:smm_power/service/login_api_service.dart';
+import 'package:sms_autofill/sms_autofill.dart';
+import 'package:smm_power/login/otp_bottom_sheet.dart';
 
 class Login_Page extends StatefulWidget {
   final String mobileNumber;
@@ -13,281 +15,277 @@ class Login_Page extends StatefulWidget {
   State<Login_Page> createState() => _Login_PageState();
 }
 
-class _Login_PageState extends State<Login_Page> {
+class _Login_PageState extends State<Login_Page> with CodeAutoFill {
   final TextEditingController _phoneController = TextEditingController();
-
   bool get _isPhoneFull => _phoneController.text.trim().length == 10;
 
+  // ── session fields from login API (type:5001) ──
+  String _token = '';
+  String _uid = '';
+  String _cusId = '';
+  String _name = '';
+  String _roleId = '';
+
+  // ── location / device ──
+  String _latitude = '';
+  String _longitude = '';
+  String _deviceId = '';
+
+  // ── app signature ──
+  String _appSignature = '';
+  bool _isLoadingOtp = false;
+
+  // ── bottom-sheet lifecycle flags ──
+  bool _isBottomSheetOpen = false;
+
+  // ── OTP controllers (held here so codeUpdated() can fill them) ──
+  final List<TextEditingController> otpControllers =
+  List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> otpFocusNodes =
+  List.generate(6, (_) => FocusNode());
+
+  // ── modalSetState handed in by OtpBottomSheet so codeUpdated can rebuild it ──
+  void Function(void Function())? _modalSetState;
+
+  // ── prevent double verify ──
+  bool _isVerifying = false;
+
+  // ─────────────────────────────────────────────
+  //  LIFECYCLE
+  // ─────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     _phoneController.addListener(() => setState(() {}));
+    _fetchAppSignature();
   }
 
   @override
   void dispose() {
+    cancel(); // CodeAutoFill mixin – cancels SMS listener
     _phoneController.dispose();
-    timer?.cancel();
-    for (var c in otpControllers) {
-      c.dispose();
-    }
+    _modalSetState = null;
+    for (final c in otpControllers) c.dispose();
+    for (final f in otpFocusNodes) f.dispose();
     super.dispose();
   }
+
+  // ── fetch AND store app signature at startup ──
+  Future<void> _fetchAppSignature() async {
+    final sig = await SmsAutoFill().getAppSignature;
+    _appSignature = sig ?? '';
+    print('▶ APP SIGNATURE: $_appSignature');
+  }
+
+  // ─────────────────────────────────────────────
+  //  CodeAutoFill MIXIN ← fires when SMS arrives
+  // ─────────────────────────────────────────────
+
+  @override
+  void codeUpdated() {
+    if (code == null || code!.length != 6) return;
+    if (!mounted || !_isBottomSheetOpen) return;
+
+    print('▶ SMS autofill received code: $code');
+    for (int i = 0; i < 6; i++) {
+      otpControllers[i].text = code![i];
+    }
+
+    // Schedule setState AFTER the current frame to avoid !_dirty assertion
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_isBottomSheetOpen) return;
+      _modalSetState?.call(() {});
+
+      // Auto-verify after boxes are painted
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted && _isBottomSheetOpen && !_isVerifying) {
+          // Delegate to the sheet's verify by triggering via shared flag;
+          // the sheet listens to _isVerifying and calls its own _verifyOtp.
+          // Since verify lives inside OtpBottomSheet, we notify it via
+          // the listenForCode callback mechanism (see _showOtpBottomSheet).
+          _autoVerifyFromSms();
+        }
+      });
+    });
+  }
+
+  // Called from codeUpdated after autofill to trigger verify in the sheet.
+  // The sheet exposes its verify through the _externalVerify callback set
+  // during _showOtpBottomSheet.
+  VoidCallback? _externalVerify;
+
+  void _autoVerifyFromSms() {
+    _externalVerify?.call();
+  }
+
+  // ─────────────────────────────────────────────
+  //  VALIDATION
+  // ─────────────────────────────────────────────
 
   String? _validatePhone(String value) {
     final phone = value.trim();
     if (phone.isEmpty) return 'Please enter your mobile number';
     if (phone.length != 10) return 'Enter valid 10-digit number';
-    if (RegExp(r'^(\d)\1{9}$').hasMatch(phone)) return 'Please enter valid number';
+    if (RegExp(r'^(\d)\1{9}$').hasMatch(phone))
+      return 'Please enter valid number';
     if (!RegExp(r'^[6-9]').hasMatch(phone)) return 'Please enter valid number';
     return null;
   }
 
-  void _onGetOtp() {
+  // ─────────────────────────────────────────────
+  //  STEP 1 – SEND OTP  (type:5001)
+  // ─────────────────────────────────────────────
+
+  Future<void> _onGetOtp() async {
     final error = _validatePhone(_phoneController.text);
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.black,
-          content: Text(error, style: const TextStyle(color: Colors.white)),
-        ),
-      );
+      _showSnackBar(error);
       return;
     }
-    showOtpBottomSheet();
-  }
 
-  bool otpStarted = false;
-  String generatedOtp = '';
-  List<TextEditingController> otpControllers =
-  List.generate(6, (index) => TextEditingController());
-  int secondsRemaining = 60;
-  Timer? timer;
+    setState(() => _isLoadingOtp = true);
 
-  void generateOtp() {
-    final random = Random();
-    generatedOtp = (100000 + random.nextInt(900000)).toString();
-    for (int i = 0; i < 6; i++) {
-      otpControllers[i].text = generatedOtp[i];
+    try {
+      // Device ID
+      final deviceInfo = DeviceInfoPlugin();
+      final androidInfo = await deviceInfo.androidInfo;
+      _deviceId = androidInfo.id;
+
+      // Location check
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => _isLoadingOtp = false);
+        _showSnackBar('Please enable location services');
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => _isLoadingOtp = false);
+          _showSnackBar('Location permission denied');
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        setState(() => _isLoadingOtp = false);
+        _showSnackBar(
+            'Location permission permanently denied. Enable from settings.');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw Exception('Location timeout. Please try again.'),
+      );
+
+      _latitude = position.latitude.toString();
+      _longitude = position.longitude.toString();
+
+      print('Device ID      : $_deviceId');
+      print('Latitude       : $_latitude');
+      print('Longitude      : $_longitude');
+      print('App Signature  : $_appSignature');
+
+      // Persist location + device
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('latitude', _latitude);
+      await prefs.setString('longitude', _longitude);
+      await prefs.setString('device_id', _deviceId);
+
+      final data = await LoginApiService.sendOtp(
+        mobile: _phoneController.text.trim(),
+        latitude: _latitude,
+        longitude: _longitude,
+        deviceId: _deviceId,
+        appSignature: _appSignature,
+      );
+
+      if (data['error'] == false) {
+        _token = data['token']?.toString() ?? '';
+        _uid = data['uid']?.toString() ?? '';
+        _cusId = data['cus_id']?.toString() ?? '';
+        _name = data['name']?.toString() ?? '';
+        _roleId = data['role_id']?.toString() ?? '';
+
+        setState(() => _isLoadingOtp = false);
+        listenForCode();
+
+        _showOtpBottomSheet();
+      } else {
+        setState(() => _isLoadingOtp = false);
+        _showSnackBar(data['error_msg'] ?? 'Failed to send OTP');
+      }
+    } catch (e) {
+      print('ERROR: $e');
+      setState(() => _isLoadingOtp = false);
+      _showSnackBar(e.toString().replaceAll('Exception: ', ''));
     }
   }
 
-  void startTimer(VoidCallback updateUI) {
-    secondsRemaining = 60;
-    timer?.cancel();
-    timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (secondsRemaining == 0) {
-        t.cancel();
-      } else {
-        secondsRemaining--;
-        updateUI();
-      }
+  // ─────────────────────────────────────────────
+  //  SHOW OTP BOTTOM SHEET
+  // ─────────────────────────────────────────────
+
+  void _showOtpBottomSheet() {
+    _isBottomSheetOpen = true;
+    _isVerifying = false;
+    _modalSetState = null;
+    _externalVerify = null;
+    for (final c in otpControllers) c.clear();
+
+    OtpBottomSheet.show(
+      context: context,
+      phoneNumber: _phoneController.text.trim(),
+      token: _token,
+      uid: _uid,
+      cusId: _cusId,
+      name: _name,
+      roleId: _roleId,
+      latitude: _latitude,
+      longitude: _longitude,
+      deviceId: _deviceId,
+      onResend: () {
+        _isBottomSheetOpen = false;
+        _modalSetState = null;
+        _onGetOtp();
+      },
+      // The sheet calls this with its own setState and verify fn so
+      // codeUpdated() in this mixin can push digits and trigger verify.
+      listenForCode: (setSheetState) {
+        _modalSetState = setSheetState;
+      },
+      onExternalVerifyReady: (verifyFn) {
+        _externalVerify = verifyFn;
+      },
+      otpControllers: otpControllers,
+      otpFocusNodes: otpFocusNodes,
+    ).whenComplete(() {
+      _isBottomSheetOpen = false;
+      _modalSetState = null;
+      _externalVerify = null;
     });
   }
 
-  void showOtpBottomSheet() {
-    otpStarted = false;
+  // ─────────────────────────────────────────────
+  //  HELPERS
+  // ─────────────────────────────────────────────
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.black,
+        content: Text(message, style: const TextStyle(color: Colors.white)),
       ),
-      builder: (context) {
-        final mq = MediaQuery.of(context);
-        final sw = mq.size.width;
-        final sh = mq.size.height;
-
-        // 6 OTP boxes with equal spacing
-        final otpBoxWidth = (sw - 80) / 6;
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            if (!otpStarted) {
-              otpStarted = true;
-              startTimer(() => setModalState(() {}));
-              generateOtp();
-            }
-
-            return Padding(
-              padding: EdgeInsets.only(
-                left: sw * 0.04,
-                right: sw * 0.04,
-                top: sh * 0.02,
-                bottom: mq.viewInsets.bottom + sh * 0.02,
-              ),
-              child: SizedBox(
-                height: sh * 0.50,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title
-                    Text(
-                      'Verify with Otp',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: sw * 0.04,
-                      ),
-                    ),
-
-                    SizedBox(height: sh * 0.012),
-
-                    // OTP image
-                    Center(
-                      child: Image.asset(
-                        'assets/login/otp.png',
-                        height: sh * 0.12,
-                      ),
-                    ),
-
-                    SizedBox(height: sh * 0.024),
-
-                    // Info RichText
-                    RichText(
-                      text: TextSpan(
-                        style: TextStyle(
-                          color: const Color(0xff6c6c6c),
-                          fontSize: sw * 0.030,
-                          fontWeight: FontWeight.w400,
-                          fontFamily: 'Poppins',
-                        ),
-                        children: [
-                          const TextSpan(
-                              text:
-                              "Waiting to automatically detect an OTP sent to\n"),
-                          TextSpan(
-                            text: "+91 ${_phoneController.text}",
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w700,
-                              fontSize: sw * 0.030,
-                              color: const Color(0XFF5B5656),
-                            ),
-                          ),
-                          const TextSpan(text: ". "),
-                          TextSpan(
-                            text: "Wrong Number?",
-                            style: TextStyle(
-                              color: const Color(0xff0A8378),
-                              fontWeight: FontWeight.w700,
-                              fontFamily: 'Poppins',
-                              fontSize: sw * 0.030,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    SizedBox(height: sh * 0.024),
-
-                    // OTP boxes
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(6, (index) {
-                        return SizedBox(
-                          width: otpBoxWidth,
-                          child: TextField(
-                            controller: otpControllers[index],
-                            textAlign: TextAlign.center,
-                            maxLength: 1,
-                            keyboardType: TextInputType.number,
-                            style: TextStyle(fontSize: sw * 0.040),
-                            decoration: const InputDecoration(
-                              counterText: '',
-                              enabledBorder: OutlineInputBorder(
-                                borderSide:
-                                BorderSide(color: Color(0XFF52B157)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                    color: Color(0XFF52B157), width: 2),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-
-                    SizedBox(height: sh * 0.010),
-
-                    // Resend + timer row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        TextButton(
-                          onPressed: secondsRemaining == 0
-                              ? () {
-                            startTimer(() => setModalState(() {}));
-                          }
-                              : null,
-                          child: Text(
-                            'Resend OTP',
-                            style: TextStyle(
-                              color: const Color(0XFF52B157),
-                              fontSize: sw * 0.035,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          "00:${secondsRemaining.toString().padLeft(2, '0')}",
-                          style: TextStyle(
-                            color: const Color(0XFF52B157),
-                            fontWeight: FontWeight.w400,
-                            fontSize: sw * 0.030,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    SizedBox(height: sh * 0.024),
-
-                    // Verify button
-                    Center(
-                      child: SizedBox(
-                        width: sw * 0.72,
-                        height: sh * 0.065,
-                        child: ElevatedButton(
-                          // ✅ NEW CODE — clears entire stack
-                          onPressed: () {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (context) => MainScaffold(
-                                  mobileNumber: _phoneController.text.trim(),
-                                ),
-                              ),
-                                  (route) => false,
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4CAF50),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: Text(
-                            "Verify",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: sw * 0.040,
-                              fontWeight: FontWeight.w700,
-                              fontFamily: 'Lato',
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
+
+  // ─────────────────────────────────────────────
+  //  BUILD
+  // ─────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -295,17 +293,14 @@ class _Login_PageState extends State<Login_Page> {
     final sw = mq.size.width;
     final sh = mq.size.height;
 
-    // Field sizing: ~85% of screen width, consistent height
     final fieldWidth = sw * 0.85;
     final fieldHeight = sh * 0.056;
     final buttonHeight = sh * 0.056;
 
     return Scaffold(
-      resizeToAvoidBottomInset: false,
       backgroundColor: const Color(0xFFFFFFFF),
       body: Stack(
         children: [
-          // Diagonal green header background
           ClipPath(
             clipper: DiagonalClipper(),
             child: Container(
@@ -320,7 +315,6 @@ class _Login_PageState extends State<Login_Page> {
               children: [
                 SizedBox(height: sh * 0.10),
 
-                // Logo card
                 Stack(
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
@@ -338,9 +332,9 @@ class _Login_PageState extends State<Login_Page> {
                     Positioned(
                       top: -2,
                       child: Image.asset(
-                        'assets/login/logo.png',
+                        'assets/login/smm_logo.jpeg',
                         width: sw * 0.38,
-                        height: sh * 0.086,
+                        height: sh * 0.075,
                         fit: BoxFit.contain,
                       ),
                     ),
@@ -349,7 +343,6 @@ class _Login_PageState extends State<Login_Page> {
 
                 SizedBox(height: sh * 0.06),
 
-                // Login illustration
                 Image.asset(
                   'assets/login/login.png',
                   height: sh * 0.32,
@@ -357,7 +350,6 @@ class _Login_PageState extends State<Login_Page> {
 
                 SizedBox(height: sh * 0.006),
 
-                // Title
                 Text(
                   'Enter Your Mobile Number',
                   style: TextStyle(
@@ -407,7 +399,6 @@ class _Login_PageState extends State<Login_Page> {
     );
   }
 
-  // ── Phone field widget ──
   Widget _buildPhoneField(
       double sw, double sh, double fieldWidth, double fieldHeight) {
     return Container(
@@ -459,11 +450,10 @@ class _Login_PageState extends State<Login_Page> {
     );
   }
 
-  // ── Get OTP button widget ──
   Widget _buildGetOtpButton(
       double sw, double fieldWidth, double buttonHeight) {
     return GestureDetector(
-      onTap: _onGetOtp,
+      onTap: _isLoadingOtp ? null : _onGetOtp,
       child: Container(
         width: fieldWidth,
         height: buttonHeight,
@@ -474,7 +464,16 @@ class _Login_PageState extends State<Login_Page> {
           borderRadius: BorderRadius.circular(30),
         ),
         alignment: Alignment.center,
-        child: Text(
+        child: _isLoadingOtp
+            ? const SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            color: Colors.white,
+            strokeWidth: 2.5,
+          ),
+        )
+            : Text(
           'Get OTP',
           style: TextStyle(
             color: Colors.white,
@@ -486,7 +485,6 @@ class _Login_PageState extends State<Login_Page> {
   }
 }
 
-// ── Diagonal Clipper (unchanged) ──
 class DiagonalClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {

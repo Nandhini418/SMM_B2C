@@ -271,7 +271,7 @@ class _CustomerSupportPageState extends State<CustomerSupportPage> {
               ),
               const SizedBox(width: 8),
               const Text(
-                '📧 support@truemotors.com',
+                '📧 support@smm.com',
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 14,
@@ -302,7 +302,7 @@ class _CustomerSupportPageState extends State<CustomerSupportPage> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Share your feedback to help us\nimprove your TrueMotors experience.',
+            'Share your feedback to help us\nimprove your SMM Power Solutions experience.',
             style: TextStyle(
               fontFamily: 'Poppins',
               fontSize: 14,

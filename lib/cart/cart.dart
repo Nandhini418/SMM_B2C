@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smm_power/cart/order_summary_category.dart';
 import 'package:smm_power/navigation_source.dart';
 import 'package:smm_power/saved_address/add_address_screen.dart';
+import 'package:smm_power/wishlist_state.dart';
 import 'cart_state.dart';
 import 'package:smm_power/saved_address/address_model.dart';
 import 'package:smm_power/saved_address/address_store.dart';
@@ -38,7 +39,6 @@ class _CartPageState extends State<CartPage> {
 
   Future<void> _loadAddresses() async {
     await _store.load();
-    // Select the default address if available
     final defaultIdx = _store.addresses.indexWhere((a) => a.isDefault);
     setState(() {
       _selectedIndex = defaultIdx >= 0 ? defaultIdx : 0;
@@ -65,7 +65,9 @@ class _CartPageState extends State<CartPage> {
   double get _total   => cartNotifier.total;
   double get _savings => cartNotifier.savings;
 
-  /// Navigate to AddAddressScreen and reload when returning
+  /// Navigate to AddAddressScreen and reload when returning.
+  /// The saved address will also appear in SavedAddressScreen
+  /// because both use AddressStore.instance.
   Future<void> _goToAddAddress() async {
     final result = await Navigator.push<AddressModel>(
       context,
@@ -73,10 +75,7 @@ class _CartPageState extends State<CartPage> {
     );
     if (result != null) {
       await _store.add(result);
-      final defaultIdx = _store.addresses.indexWhere((a) => a.isDefault);
-      setState(() {
-        _selectedIndex = defaultIdx >= 0 ? defaultIdx : 0;
-      });
+      await _loadAddresses();
     }
   }
 
@@ -131,65 +130,59 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
+  // ── EMPTY CART: always show just the empty state message ─────
   Widget _buildEmptyCart(double sw, double sh) {
-    return Column(
-      children: [
-        _buildDeliveryBanner(sw, sh),
-        Expanded(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.shopping_cart_outlined,
-                  size: sw * 0.267,
-                  color: const Color(0xFFD0D5F5),
-                ),
-                SizedBox(height: sh * 0.025),
-                Text(
-                  'Your cart is empty!',
-                  style: TextStyle(
-                    fontSize: sw * 0.053,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1A1A1A),
-                  ),
-                ),
-                SizedBox(height: sh * 0.010),
-                Text(
-                  'Add items to get started.',
-                  style: TextStyle(
-                    fontSize: sw * 0.037,
-                    color: const Color(0xFF888888),
-                  ),
-                ),
-                SizedBox(height: sh * 0.035),
-                ElevatedButton(
-                  onPressed: _handleBack,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF283897),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: sw * 0.093,
-                      vertical: sh * 0.017,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    'Shop Now',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: sw * 0.040,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.shopping_cart_outlined,
+            size: sw * 0.267,
+            color: const Color(0xFFD0D5F5),
+          ),
+          SizedBox(height: sh * 0.025),
+          Text(
+            'Your cart is empty!',
+            style: TextStyle(
+              fontSize: sw * 0.053,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1A1A1A),
             ),
           ),
-        ),
-      ],
+          SizedBox(height: sh * 0.010),
+          Text(
+            'Add items to get started.',
+            style: TextStyle(
+              fontSize: sw * 0.037,
+              color: const Color(0xFF888888),
+            ),
+          ),
+          SizedBox(height: sh * 0.035),
+          ElevatedButton(
+            onPressed: _handleBack,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF283897),
+              padding: EdgeInsets.symmetric(
+                horizontal: sw * 0.093,
+                vertical: sh * 0.017,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+            ),
+            child: Text(
+              'Shop Now',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: sw * 0.040,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -199,8 +192,7 @@ class _CartPageState extends State<CartPage> {
     elevation: 0,
     leading: IconButton(
       onPressed: _handleBack,
-      icon: Icon(Icons.chevron_left,
-          color: const Color(0xff000000)),
+      icon: const Icon(Icons.chevron_left, color: Color(0xff000000)),
     ),
     titleSpacing: 0,
     title: Text(
@@ -286,9 +278,7 @@ class _CartPageState extends State<CartPage> {
                       SizedBox(height: sh * 0.002),
                     ],
                   )
-                  // AFTER
-                      : _items.isEmpty
-                      ? const SizedBox.shrink()
+                  // No address saved — show message + Add button
                       : Row(
                     children: [
                       Icon(
@@ -311,38 +301,58 @@ class _CartPageState extends State<CartPage> {
                   ),
                 ),
                 SizedBox(width: sw * 0.027),
-                if (hasAddress)
-                  GestureDetector(
-                    onTap: () => _showAddressSheet(),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: sw * 0.025,
-                        vertical: sh * 0.005,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(color: const Color(0xff999999)),
-                      ),
-                      child: Text(
-                        'Change',
-                        style: TextStyle(
-                          color: const Color(0xFF4256D3),
-                          fontWeight: FontWeight.w600,
-                          fontSize: sw * 0.035,
-                        ),
+                // Show "Change" when address exists, "Add" when not
+                hasAddress
+                    ? GestureDetector(
+                  onTap: () => _showAddressSheet(),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: sw * 0.025,
+                      vertical: sh * 0.005,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xff999999)),
+                    ),
+                    child: Text(
+                      'Change',
+                      style: TextStyle(
+                        color: const Color(0xFF4256D3),
+                        fontWeight: FontWeight.w600,
+                        fontSize: sw * 0.035,
                       ),
                     ),
                   ),
+                )
+                    : GestureDetector(
+                  onTap: _goToAddAddress,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: sw * 0.025,
+                      vertical: sh * 0.005,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xff999999)),
+                    ),
+                    child: Text(
+                      'Add',
+                      style: TextStyle(
+                        color: const Color(0xFF4256D3),
+                        fontWeight: FontWeight.w600,
+                        fontSize: sw * 0.035,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-          // AFTER
-          if (_items.isNotEmpty)
-            Divider(
-              color: const Color(0xFF4256D3),
-              height: 2,
-              thickness: 1,
-            ),
+          Divider(
+            color: const Color(0xFF4256D3),
+            height: 2,
+            thickness: 1,
+          ),
         ],
       ),
     );
@@ -363,7 +373,7 @@ class _CartPageState extends State<CartPage> {
   // ── CART CARD ─────────────────────────────────────
   Widget _buildCartCard(CartItemModel item, int index, double sw, double sh) {
     return Container(
-      margin: EdgeInsets.symmetric(vertical: sh * 0.007, ),
+      margin: EdgeInsets.symmetric(vertical: sh * 0.007),
       color: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -399,13 +409,31 @@ class _CartPageState extends State<CartPage> {
                         height: sw * 0.213,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Color(0xFF897F7F)),
+                          border: Border.all(color: const Color(0xFF897F7F)),
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.asset(
+                          child: item.imagePath.startsWith('http')
+                              ? Image.network(
                             item.imagePath,
                             fit: BoxFit.contain,
+                            loadingBuilder: (_, child, progress) =>
+                            progress == null
+                                ? child
+                                : const Center(
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF4256D3))),
+                            errorBuilder: (_, __, ___) => const Icon(
+                                Icons.image_not_supported_outlined,
+                                color: Colors.grey),
+                          )
+                              : Image.asset(
+                            item.imagePath,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Icon(
+                                Icons.image_not_supported_outlined,
+                                color: Colors.grey),
                           ),
                         ),
                       ),
@@ -480,7 +508,7 @@ class _CartPageState extends State<CartPage> {
                             child: Text(
                               '${item.discountPercent}% OFF',
                               style: TextStyle(
-                                color: Color(0xFF52B157),
+                                color: const Color(0xFF52B157),
                                 fontSize: sw * 0.034,
                                 fontWeight: FontWeight.w400,
                               ),
@@ -492,7 +520,7 @@ class _CartPageState extends State<CartPage> {
                               fontSize: sw * 0.034,
                               color: const Color(0xFF9F9F9F),
                               decoration: TextDecoration.lineThrough,
-                              decorationColor: Color(0xFF9F9F9F)
+                              decorationColor: const Color(0xFF9F9F9F),
                             ),
                           ),
                           Text(
@@ -515,8 +543,38 @@ class _CartPageState extends State<CartPage> {
             _actionCell('assets/picture/remove.png', 'Remove', () {
               cartNotifier.removeItem(item);
             }, sw, sh),
-            _actionCell('assets/picture/save.png', 'Save for later', () {}, sw, sh),
-            _actionCell('assets/picture/buy.png', 'Buy this now', () {}, sw, sh),
+            _actionCell('assets/picture/save.png', 'Save for later', () {
+              // Save item to wishlist
+              final wishlistItem = WishlistItem(
+                name: item.name,
+                mrp: item.originalPrice.toInt(),
+                price: item.price.toInt(),
+                unit: '',
+                image: item.imagePath,
+              );
+              wishlistNotifier.toggle(wishlistItem);
+              // Remove from cart
+              cartNotifier.removeItem(item);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Item saved to wishlist'),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }, sw, sh),
+            _actionCell('assets/picture/buy.png', 'Buy this now', () {
+              // Navigate to Order Summary for this single product only
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => Order_Summary_Category(
+                    source: widget.source,
+                    buyNowItem: item,
+                  ),
+                ),
+              );
+            }, sw, sh),
           ]),
         ],
       ),
@@ -528,7 +586,7 @@ class _CartPageState extends State<CartPage> {
       decoration: const BoxDecoration(
         border: Border(
           top: BorderSide(color: Color(0xFF555555), width: 1),
-          bottom: BorderSide(color: Color(0xFF555555), width: 1)
+          bottom: BorderSide(color: Color(0xFF555555), width: 1),
         ),
       ),
       child: IntrinsicHeight(
@@ -590,7 +648,6 @@ class _CartPageState extends State<CartPage> {
             5,
                 (i) => PopupMenuItem<int>(
               value: i + 1,
-
               child: Text('${i + 1}', style: TextStyle(fontSize: sw * 0.035)),
             ),
           ),
@@ -599,24 +656,24 @@ class _CartPageState extends State<CartPage> {
       },
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: sw * 0.010,
-          vertical: sh * 0.003
-        ),
+            horizontal: sw * 0.010,
+            vertical: sh * 0.003),
         decoration: BoxDecoration(
-          border: Border.all(color: Color(0xFF555555)),
+          border: Border.all(color: const Color(0xFF555555)),
           borderRadius: BorderRadius.circular(2),
           color: Colors.white,
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text('Qty: ${item.qty}',
+          Text(
+            'Qty: ${item.qty}',
             style: TextStyle(
-              color: Color(0xFF555555),
-              fontSize: sw * 0.03, 
+              color: const Color(0xFF555555),
+              fontSize: sw * 0.03,
               fontWeight: FontWeight.w400,
             ),
           ),
           SizedBox(width: sw * 0.010),
-          Icon(Icons.arrow_drop_down, size: sw * 0.043, color: Color(0xFF555555),),
+          Icon(Icons.arrow_drop_down, size: sw * 0.043, color: const Color(0xFF555555)),
         ]),
       ),
     );
@@ -631,14 +688,12 @@ class _CartPageState extends State<CartPage> {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Image.asset('assets/picture/correct.png',
-          height: sh * 0.02,
-        ),
+        Image.asset('assets/picture/correct.png', height: sh * 0.02),
         SizedBox(width: sw * 0.016),
         Text(
           "You'll save ₹ ${_savings.toInt()} on this order",
           style: TextStyle(
-            color: Color(0xFF046B09),
+            color: const Color(0xFF046B09),
             fontSize: sw * 0.035,
             fontWeight: FontWeight.w500,
           ),
@@ -667,7 +722,7 @@ class _CartPageState extends State<CartPage> {
                   fontSize: sw * 0.035,
                   color: const Color(0xFF9F9F9F),
                   decoration: TextDecoration.lineThrough,
-                  decorationColor: Color(0xFF9F9F9F)
+                  decorationColor: const Color(0xFF9F9F9F),
                 ),
               ),
               Row(mainAxisSize: MainAxisSize.min, children: [
@@ -680,9 +735,7 @@ class _CartPageState extends State<CartPage> {
                   ),
                 ),
                 SizedBox(width: sw * 0.011),
-                Image.asset('assets/picture/info.png',
-                  height: sh * 0.02,
-                )
+                Image.asset('assets/picture/info.png', height: sh * 0.02),
               ]),
             ],
           ),
@@ -694,7 +747,7 @@ class _CartPageState extends State<CartPage> {
               ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFFF4E219),
+              backgroundColor: const Color(0xFFF4E219),
               foregroundColor: const Color(0xFF1A1A1A),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               padding: EdgeInsets.symmetric(
@@ -923,7 +976,6 @@ class _CartPageState extends State<CartPage> {
                               ],
                             ),
                           ),
-                          // Selected radio indicator
                           Radio<int>(
                             value: index,
                             groupValue: _selectedIndex,

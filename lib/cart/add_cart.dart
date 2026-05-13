@@ -34,6 +34,54 @@ class _AddToCartSheet extends StatelessWidget {
     required this.overlay,
   });
 
+  /// Renders the product image — supports both network URLs and local assets,
+  /// with a fallback icon if loading fails or the path is empty.
+  Widget _buildProductImage(double sw) {
+    final path = item.imagePath.trim();
+
+    if (path.isEmpty) {
+      return _fallbackIcon(sw);
+    }
+
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.contain,
+        width: double.infinity,
+        height: double.infinity,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return const Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Color(0xFF4256D3),
+            ),
+          );
+        },
+        errorBuilder: (_, __, ___) => _fallbackIcon(sw),
+      );
+    }
+
+    // Local asset
+    return Image.asset(
+      path,
+      fit: BoxFit.contain,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (_, __, ___) => _fallbackIcon(sw),
+    );
+  }
+
+  Widget _fallbackIcon(double sw) {
+    return Center(
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        color: Colors.grey,
+        size: sw * 0.107,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -64,19 +112,16 @@ class _AddToCartSheet extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset(
-                  item.imagePath,
-                  width: sw * 0.213,
-                  height: sw * 0.213,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: sw * 0.213,
-                    height: sw * 0.213,
-                    color: Colors.grey[100],
-                    child: const Icon(Icons.image_outlined, color: Colors.grey),
-                  ),
+              Container(
+                width: sw * 0.213,
+                height: sw * 0.213,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF897F7F)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: _buildProductImage(sw),
                 ),
               ),
               SizedBox(width: sw * 0.040),
@@ -103,34 +148,36 @@ class _AddToCartSheet extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: sw * 0.016),
-                      Text(
-                        '₹${item.originalPrice.toInt()}',
-                        style: TextStyle(
-                          fontSize: sw * 0.032,
-                          color: const Color(0xFF999999),
-                          decoration: TextDecoration.lineThrough,
+                      if (item.originalPrice != item.price)
+                        Text(
+                          '₹${item.originalPrice.toInt()}',
+                          style: TextStyle(
+                            fontSize: sw * 0.032,
+                            color: const Color(0xFF999999),
+                            decoration: TextDecoration.lineThrough,
+                          ),
                         ),
-                      ),
                     ]),
                     SizedBox(height: sh * 0.005),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: sw * 0.016,
-                        vertical: sh * 0.003,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '${item.discountPercent}% OFF',
-                        style: TextStyle(
-                          color: const Color(0xFF2E7D32),
-                          fontSize: sw * 0.029,
-                          fontWeight: FontWeight.w700,
+                    if (item.discountPercent > 0)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: sw * 0.016,
+                          vertical: sh * 0.003,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${item.discountPercent}% OFF',
+                          style: TextStyle(
+                            color: const Color(0xFF2E7D32),
+                            fontSize: sw * 0.029,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -143,11 +190,13 @@ class _AddToCartSheet extends StatelessWidget {
 
           // ── delivery info ──
           Row(children: [
-            const Icon(Icons.local_shipping_outlined, color: Color(0xFF4256D3), size: 20),
+            const Icon(Icons.local_shipping_outlined,
+                color: Color(0xFF4256D3), size: 20),
             SizedBox(width: sw * 0.021),
             Text(
               item.deliveryDate ?? 'Delivery by Mar 14, Sat',
-              style: TextStyle(fontSize: sw * 0.035, color: const Color(0xFF333333)),
+              style: TextStyle(
+                  fontSize: sw * 0.035, color: const Color(0xFF333333)),
             ),
           ]),
 
@@ -161,7 +210,8 @@ class _AddToCartSheet extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: sh * 0.017),
                   side: const BorderSide(color: Color(0xFF4256D3)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 child: Text(
                   'Cancel',
@@ -184,7 +234,8 @@ class _AddToCartSheet extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF283897),
                   padding: EdgeInsets.symmetric(vertical: sh * 0.017),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                   elevation: 0,
                 ),
                 child: Text(
@@ -226,7 +277,6 @@ class _AddToCartSheet extends StatelessWidget {
 
     overlay.insert(entry);
 
-    // Auto-remove after 2 seconds
     Future.delayed(const Duration(seconds: 2), () {
       if (entry.mounted) entry.remove();
     });
@@ -266,7 +316,6 @@ class _CartToastState extends State<_CartToast>
     _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
     _ctrl.forward();
 
-    // Start fade-out at 1.7s so it's gone by 2s
     Future.delayed(const Duration(milliseconds: 1700), () {
       if (mounted) _ctrl.reverse();
     });
@@ -309,7 +358,8 @@ class _CartToastState extends State<_CartToast>
             ),
             child: Row(
               children: [
-                const Icon(Icons.check_circle, color: Color(0xFF52B157), size: 20),
+                const Icon(Icons.check_circle,
+                    color: Color(0xFF52B157), size: 20),
                 SizedBox(width: sw * 0.021),
                 Expanded(
                   child: Text(

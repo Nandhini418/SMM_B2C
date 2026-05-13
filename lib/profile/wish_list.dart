@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smm_power/wishlist_state.dart';
 import 'package:smm_power/cart/cart_state.dart';
 import 'package:smm_power/cart/add_cart.dart';
+import 'package:smm_power/category/product_details.dart';
 
 class WishListScreen extends StatefulWidget {
   const WishListScreen({super.key});
@@ -54,7 +55,8 @@ class _WishListScreenState extends State<WishListScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.chevron_left, color: Color(0xFF4256D3)),
+                    icon: const Icon(Icons.chevron_left,
+                        color: Color(0xFF4256D3)),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   const SizedBox(width: 4),
@@ -72,7 +74,9 @@ class _WishListScreenState extends State<WishListScreen> {
           ),
         ),
       ),
-      body: items.isEmpty ? _buildEmptyState(sw, sh) : _buildGrid(sw, sh, items),
+      body: items.isEmpty
+          ? _buildEmptyState(sw, sh)
+          : _buildGrid(sw, sh, items),
     );
   }
 
@@ -81,7 +85,8 @@ class _WishListScreenState extends State<WishListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.favorite_border, size: sw * 0.24, color: const Color(0xFFD0D5F5)),
+          Icon(Icons.favorite_border,
+              size: sw * 0.24, color: const Color(0xFFD0D5F5)),
           SizedBox(height: sh * 0.025),
           Text(
             'No Wishlist Yet',
@@ -94,7 +99,8 @@ class _WishListScreenState extends State<WishListScreen> {
           SizedBox(height: sh * 0.010),
           Text(
             'Tap the ♡ on any product to save it here.',
-            style: TextStyle(color: const Color(0xFF888888), fontSize: sw * 0.037),
+            style: TextStyle(
+                color: const Color(0xFF888888), fontSize: sw * 0.037),
             textAlign: TextAlign.center,
           ),
         ],
@@ -104,7 +110,8 @@ class _WishListScreenState extends State<WishListScreen> {
 
   Widget _buildGrid(double sw, double sh, List<WishlistItem> items) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: sw * 0.040, vertical: sh * 0.016),
+      padding: EdgeInsets.symmetric(
+          horizontal: sw * 0.040, vertical: sh * 0.016),
       child: GridView.builder(
         itemCount: items.length,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -113,7 +120,8 @@ class _WishListScreenState extends State<WishListScreen> {
           mainAxisSpacing: 12,
           childAspectRatio: 0.72,
         ),
-        itemBuilder: (ctx, i) => _WishlistCard(item: items[i], sw: sw, sh: sh),
+        itemBuilder: (ctx, i) =>
+            _WishlistCard(item: items[i], sw: sw, sh: sh),
       ),
     );
   }
@@ -124,133 +132,203 @@ class _WishlistCard extends StatelessWidget {
   final double sw;
   final double sh;
 
-  const _WishlistCard({required this.item, required this.sw, required this.sh});
+  const _WishlistCard(
+      {required this.item, required this.sw, required this.sh});
+
+  void _openProductDetail(BuildContext context) {
+    if (item.productId == 0) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductDetailsScreen(
+          productId: item.productId,
+          productName: item.name,
+        ),
+      ),
+    );
+  }
+
+  /// Renders the product image — supports network URLs, local assets,
+  /// and shows a fallback icon on error or empty path.
+  Widget _buildImage(double sw, double sh) {
+    final path = item.image.trim();
+    if (path.isEmpty) return _fallback(sh);
+
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        height: sh * 0.100,
+        fit: BoxFit.contain,
+        loadingBuilder: (_, child, progress) => progress == null
+            ? child
+            : SizedBox(
+          height: sh * 0.100,
+          child: const Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Color(0xFF4256D3),
+            ),
+          ),
+        ),
+        errorBuilder: (_, __, ___) => _fallback(sh),
+      );
+    }
+
+    return Image.asset(
+      path,
+      height: sh * 0.100,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => _fallback(sh),
+    );
+  }
+
+  Widget _fallback(double sh) => SizedBox(
+    height: sh * 0.100,
+    child: const Center(
+      child: Icon(Icons.image_not_supported_outlined,
+          color: Colors.grey),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFC8C8C8)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Heart (remove from wishlist) ──
-          Align(
-            alignment: Alignment.topRight,
-            child: Padding(
-              padding: EdgeInsets.only(top: sh * 0.008, right: sw * 0.027),
-              child: GestureDetector(
-                onTap: () => wishlistNotifier.toggle(item),
-                child: const Icon(Icons.favorite, color: Colors.red, size: 22),
+    return GestureDetector(
+      onTap: () => _openProductDetail(context),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFC8C8C8)),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x14000000),
+                blurRadius: 6,
+                offset: Offset(0, 2)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Heart (remove from wishlist) ──
+            Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: EdgeInsets.only(
+                    top: sh * 0.008, right: sw * 0.027),
+                child: GestureDetector(
+                  onTap: () => wishlistNotifier.toggle(item),
+                  behavior: HitTestBehavior.opaque,
+                  child: const Icon(Icons.favorite,
+                      color: Colors.red, size: 22),
+                ),
               ),
             ),
-          ),
 
-          // ── Product image ──
-          Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: sh * 0.006),
-              child: Image.asset(
-                item.image,
-                height: sh * 0.100,
-                fit: BoxFit.contain,
+            // ── Product image ──
+            Center(
+              child: Padding(
+                padding:
+                EdgeInsets.symmetric(vertical: sh * 0.006),
+                child: _buildImage(sw, sh),
               ),
             ),
-          ),
 
-          const Divider(height: 1, thickness: 1, color: Color(0xFFC3C3C3)),
+            const Divider(
+                height: 1,
+                thickness: 1,
+                color: Color(0xFFC3C3C3)),
 
-          // ── Details ──
-          Padding(
-            padding: EdgeInsets.fromLTRB(sw * 0.027, sh * 0.007, sw * 0.027, sh * 0.007),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: const Color(0xFF4256D3),
-                    fontSize: sw * 0.037,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: sh * 0.004),
-                Row(
-                  children: [
-                    Text(
-                      '₹ ${item.price}',
-                      style: TextStyle(
-                        color: const Color(0xFF1A1A1A),
-                        fontSize: sw * 0.037,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: sw * 0.016),
-                    Text(
-                      '₹ ${item.mrp}',
-                      style: TextStyle(
-                        color: const Color(0xFFA8A8A8),
-                        fontSize: sw * 0.030,
-                        decoration: TextDecoration.lineThrough,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: sh * 0.010),
-
-                // ── Add to Cart button ──
-                SizedBox(
-                  width: double.infinity,
-                  height: sh * 0.038,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      showAddToCartSheet(
-                        context,
-                        item: CartItemModel(
-                          name: item.name,
-                          imagePath: item.image,
-                          price: item.price.toDouble(),
-                          originalPrice: item.mrp.toDouble(),
-                          discountPercent:
-                          (((item.mrp - item.price) / item.mrp) * 100).round(),
-                          deliveryDate: 'Delivery by Mar 14, Sat',
-                        ),
-                      );
-                    },
-                    icon: Icon(
-                      Icons.shopping_cart_outlined,
-                      size: sw * 0.037,
+            // ── Details ──
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                  sw * 0.027, sh * 0.007, sw * 0.027, sh * 0.007),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
                       color: const Color(0xFF4256D3),
+                      fontSize: sw * 0.037,
+                      fontWeight: FontWeight.w600,
                     ),
-                    label: Text(
-                      'Add Cart',
-                      style: TextStyle(
-                        color: const Color(0xFF4256D3),
-                        fontSize: sw * 0.030,
-                        fontWeight: FontWeight.w600,
+                  ),
+                  SizedBox(height: sh * 0.004),
+                  Row(
+                    children: [
+                      Text(
+                        '₹ ${item.price}',
+                        style: TextStyle(
+                          color: const Color(0xFF1A1A1A),
+                          fontSize: sw * 0.037,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      side: const BorderSide(color: Color(0xFF4256D3)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+                      SizedBox(width: sw * 0.016),
+                      Text(
+                        '₹ ${item.mrp}',
+                        style: TextStyle(
+                          color: const Color(0xFFA8A8A8),
+                          fontSize: sw * 0.030,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: sh * 0.010),
+
+                  // ── Add to Cart button ──
+                  SizedBox(
+                    width: double.infinity,
+                    height: sh * 0.038,
+                    child: OutlinedButton.icon(
+                      // Stop tap bubbling to the card's GestureDetector
+                      onPressed: () {
+                        showAddToCartSheet(
+                          context,
+                          item: CartItemModel(
+                            name: item.name,
+                            imagePath: item.image,
+                            price: item.price.toDouble(),
+                            originalPrice: item.mrp.toDouble(),
+                            discountPercent:
+                            (((item.mrp - item.price) / item.mrp) *
+                                100)
+                                .round(),
+                            deliveryDate: 'Delivery by Mar 14, Sat',
+                          ),
+                        );
+                      },
+                      icon: Icon(
+                        Icons.shopping_cart_outlined,
+                        size: sw * 0.037,
+                        color: const Color(0xFF4256D3),
+                      ),
+                      label: Text(
+                        'Add Cart',
+                        style: TextStyle(
+                          color: const Color(0xFF4256D3),
+                          fontSize: sw * 0.030,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        side:
+                        const BorderSide(color: Color(0xFF4256D3)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -9,6 +9,7 @@ import 'package:smm_power/profile/profile_store.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:smm_power/smm_support/customer_support.dart';
+import 'package:shared_preferences/shared_preferences.dart ';
 
 class ProfileScreen extends StatefulWidget {
   final String mobileNumber;
@@ -31,6 +32,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (number.length <= 5) return number;
     return "${number.substring(0, 5)} ${number.substring(5)}";
   }
+
+  // Paste this _showLogoutDialog() method inside your widget's State class.
+// It replaces the existing logout dialog — only the YES button onPressed is changed.
 
   void _showLogoutDialog() {
     showDialog(
@@ -96,7 +100,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     // ✅ YES Button
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          // ── Clear persistent login so next app open
+                          //    goes through Splash → Login flow ──
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.clear();
+
+                          if (!context.mounted) return;
                           Navigator.pop(context);
 
                           Navigator.pushReplacement(
@@ -455,12 +465,10 @@ class _LanguageSheetState extends State<_LanguageSheet> {
 
   final List<Map<String, String>> languages = [
     {"title": "தமிழ்", "sub": "Tamil"},
+    {"title": "English", "sub": "English"},
     {"title": "తెలుగు", "sub": "Telugu"},
     {"title": "ಕನ್ನಡ", "sub": "Kannada"},
-    {"title": "বাংলা", "sub": "Bengali"},
     {"title": "മലയാളം", "sub": "Malayalam"},
-    {"title": "English", "sub": "English"},
-    {"title": "ગુજરાતી", "sub": "Gujarati"},
     {"title": "हिन्दी", "sub": "Hindi"},
   ];
 

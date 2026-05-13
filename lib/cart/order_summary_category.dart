@@ -14,21 +14,29 @@ const Color kRed     = Color(0xFFD32F2F);
 
 class Order_Summary_Category extends StatefulWidget {
   final NavigationSource source;
-  const Order_Summary_Category({super.key, this.source = NavigationSource.bottomNav});
+  /// When coming from "Buy Now", pass a single item here.
+  /// If null, the screen reads from cartNotifier as usual.
+  final CartItemModel? buyNowItem;
+
+  const Order_Summary_Category({
+    super.key,
+    this.source = NavigationSource.bottomNav,
+    this.buyNowItem,
+  });
 
   @override
   State<Order_Summary_Category> createState() => _Order_Summary_CategoryState();
 }
 
 class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
-  // ── ADDRESS (same logic as CartPage) ──────────────
+  // ── ADDRESS ──────────────────────────────────────
   final _store = AddressStore.instance;
   int _selectedIndex = 0;
-
   bool _showFeeBreakdown = false;
 
-  // ── derived from cart ──────────────────────────────
-  List<CartItemModel> get cartItems => cartNotifier.value;
+  // ── Items: buy-now single item OR full cart ───────
+  List<CartItemModel> get cartItems =>
+      widget.buyNowItem != null ? [widget.buyNowItem!] : cartNotifier.value;
 
   double get _mrpTotal =>
       cartItems.fold(0.0, (s, e) => s + e.originalPrice * e.qty);
@@ -45,11 +53,13 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
   @override
   void initState() {
     super.initState();
-    cartNotifier.addListener(_onCartChanged);
+    // Only listen to cart changes when NOT in buy-now mode
+    if (widget.buyNowItem == null) {
+      cartNotifier.addListener(_onCartChanged);
+    }
     _loadAddresses();
   }
 
-  /// Mirrors CartPage._loadAddresses()
   Future<void> _loadAddresses() async {
     await _store.load();
     final defaultIdx = _store.addresses.indexWhere((a) => a.isDefault);
@@ -60,7 +70,9 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
 
   @override
   void dispose() {
-    cartNotifier.removeListener(_onCartChanged);
+    if (widget.buyNowItem == null) {
+      cartNotifier.removeListener(_onCartChanged);
+    }
     super.dispose();
   }
 
@@ -71,6 +83,23 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
       return '${phone.substring(0, 5)} ${phone.substring(5)}';
     }
     return phone;
+  }
+
+  /// Navigate to AddAddressScreen and reload on return.
+  /// Address is saved into AddressStore.instance so it also
+  /// appears in SavedAddressScreen.
+  Future<void> _goToAddAddress() async {
+    final result = await Navigator.push<AddressModel>(
+      context,
+      MaterialPageRoute(builder: (_) => const AddAddressScreen()),
+    );
+    if (result != null) {
+      await _store.add(result);
+      final defaultIdx = _store.addresses.indexWhere((a) => a.isDefault);
+      setState(() {
+        _selectedIndex = defaultIdx >= 0 ? defaultIdx : 0;
+      });
+    }
   }
 
   @override
@@ -89,32 +118,19 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(height: sh * 0.015,),
+                  SizedBox(height: sh * 0.015),
                   _buildStepper(sw, sh),
                   const Divider(color: Color(0xff4256D3)),
                   _buildDeliveryCard(sw, sh),
                   const Divider(color: Color(0xff4256D3)),
-                  if (cartItems.isEmpty)
-                    Padding(
-                      padding: EdgeInsets.symmetric(vertical: sh * 0.060),
-                      child: Center(
-                        child: Text(
-                          'Your cart is empty.',
-                          style: TextStyle(
-                            fontSize: sw * 0.040,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: cartItems.length,
-                      itemBuilder: (context, index) =>
-                          _buildProduct(cartItems[index], sw, sh),
-                    ),
+                  // Always show items — cartItems is never empty in buy-now mode
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: cartItems.length,
+                    itemBuilder: (context, index) =>
+                        _buildProduct(cartItems[index], sw, sh),
+                  ),
                   if (cartItems.isNotEmpty) _buildBill(sw, sh),
                   SizedBox(height: sh * 0.01),
                   if (cartItems.isNotEmpty) _buildDisclaimer(sw, sh),
@@ -176,21 +192,24 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                     width: sw * 0.07,
                     height: sw * 0.07,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFFAAB5FF),
-                      border: Border.all(
-                        color: Color(0xFF4256D3),
-                        width: 2
-                      )
-                    ),
-                    child: Icon(Icons.check, size: sw * 0.037, color: const Color(0xff4256D3)),
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFAAB5FF),
+                        border: Border.all(
+                            color: const Color(0xFF4256D3), width: 2)),
+                    child: Icon(Icons.check,
+                        size: sw * 0.037,
+                        color: const Color(0xff4256D3)),
                   ),
-                  Expanded(child: Container(height: 1.5, color: const Color(0xff4256D3))),
+                  Expanded(
+                      child: Container(
+                          height: 1.5,
+                          color: const Color(0xff4256D3))),
                   Container(
                     width: sw * 0.07,
                     height: sw * 0.07,
                     decoration: const BoxDecoration(
-                        shape: BoxShape.circle, color: Color(0xff4256D3)),
+                        shape: BoxShape.circle,
+                        color: Color(0xff4256D3)),
                     child: Center(
                       child: Text('2',
                           style: TextStyle(
@@ -199,7 +218,10 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                               fontWeight: FontWeight.w500)),
                     ),
                   ),
-                  Expanded(child: Container(height: 1.5, color: const Color(0xFF555555))),
+                  Expanded(
+                      child: Container(
+                          height: 1.5,
+                          color: const Color(0xFF555555))),
                   Container(
                     width: sw * 0.07,
                     height: sw * 0.07,
@@ -207,14 +229,14 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                       shape: BoxShape.circle,
                       color: Colors.white,
                       border: Border.all(
-                        color: Color(0xFF555555),
+                        color: const Color(0xFF555555),
                         width: 2,
                       ),
                     ),
                     child: Center(
                       child: Text('3',
                           style: TextStyle(
-                              color: Color(0xFF555555),
+                              color: const Color(0xFF555555),
                               fontSize: sw * 0.033,
                               fontWeight: FontWeight.w500)),
                     ),
@@ -249,7 +271,7 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
     );
   }
 
-  // ── DELIVERY CARD (real AddressStore logic) ────────
+  // ── DELIVERY CARD ─────────────────────────────────
   Widget _buildDeliveryCard(double sw, double sh) {
     final addresses = _store.addresses;
     final hasAddress = addresses.isNotEmpty;
@@ -288,14 +310,15 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                   SizedBox(width: sw * 0.03),
                   Container(
                     padding: EdgeInsets.symmetric(
-                        horizontal: sw * 0.013, vertical: sh * 0.002),
+                        horizontal: sw * 0.013,
+                        vertical: sh * 0.002),
                     decoration: BoxDecoration(
                         color: const Color(0xFFE9DEDE),
                         borderRadius: BorderRadius.circular(4)),
                     child: Text(
                       addr.type,
                       style: TextStyle(
-                        color: Color(0xFF555252),
+                        color: const Color(0xFF555252),
                         fontSize: sw * 0.027,
                         fontWeight: FontWeight.w600,
                       ),
@@ -313,24 +336,22 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                 SizedBox(height: sh * 0.004),
                 if (addr.phone.isNotEmpty)
                   Text(
-                    '${_formatPhone(addr.phone)}',
+                    _formatPhone(addr.phone),
                     style: TextStyle(
                         fontSize: sw * 0.034,
                         color: const Color(0xFF555555)),
                   ),
               ],
             )
+            // No address — message + Add button (handled by the right-side button)
                 : Row(
               children: [
-                Icon(
-                  Icons.location_on_outlined,
-                  color: kPrimary,
-                  size: sw * 0.053,
-                ),
+                Icon(Icons.location_on_outlined,
+                    color: kPrimary, size: sw * 0.053),
                 SizedBox(width: sw * 0.016),
                 Expanded(
                   child: Text(
-                    'No delivery address saved.\nAdd one to continue.',
+                    'Add a delivery address to continue',
                     style: TextStyle(
                       fontSize: sw * 0.034,
                       color: const Color(0xFF555555),
@@ -343,25 +364,44 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
             ),
           ),
           SizedBox(width: sw * 0.027),
-          if (hasAddress)
-            GestureDetector(
-              onTap: () => _showAddressSheet(sw, sh),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                    horizontal: sw * 0.027, vertical: sh * 0.007),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xff999999)),
-                ),
-                child: Text(
-                  'Change',
-                  style: TextStyle(
-                      color: kPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: sw * 0.035),
-                ),
+          // Show "Change" when address exists, "Add" when not
+          hasAddress
+              ? GestureDetector(
+            onTap: () => _showAddressSheet(sw, sh),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                  horizontal: sw * 0.027, vertical: sh * 0.007),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xff999999)),
+              ),
+              child: Text(
+                'Change',
+                style: TextStyle(
+                    color: kPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: sw * 0.035),
               ),
             ),
+          )
+              : GestureDetector(
+            onTap: _goToAddAddress,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                  horizontal: sw * 0.027, vertical: sh * 0.007),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xff999999)),
+              ),
+              child: Text(
+                'Add',
+                style: TextStyle(
+                    color: kPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: sw * 0.035),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -389,15 +429,13 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Select delivery address',
-                  style: TextStyle(
-                      fontSize: sw * 0.043, fontWeight: FontWeight.w600),
-                ),
+                Text('Select delivery address',
+                    style: TextStyle(
+                        fontSize: sw * 0.043,
+                        fontWeight: FontWeight.w600)),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
                   icon: Icon(Icons.close, size: sw * 0.053),
@@ -408,14 +446,13 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Saved address',
-                  style: TextStyle(
-                      fontSize: sw * 0.037, fontWeight: FontWeight.w500),
-                ),
+                Text('Saved address',
+                    style: TextStyle(
+                        fontSize: sw * 0.037,
+                        fontWeight: FontWeight.w500)),
                 InkWell(
                   onTap: () async {
-                    Navigator.pop(context); // close sheet first
+                    Navigator.pop(context);
                     final result = await Navigator.push<AddressModel>(
                       context,
                       MaterialPageRoute(
@@ -423,30 +460,27 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                     );
                     if (result != null) {
                       await _store.add(result);
-                      final defaultIdx =
-                      _store.addresses.indexWhere((a) => a.isDefault);
+                      final defaultIdx = _store.addresses
+                          .indexWhere((a) => a.isDefault);
                       setState(() {
-                        _selectedIndex = defaultIdx >= 0 ? defaultIdx : 0;
+                        _selectedIndex =
+                        defaultIdx >= 0 ? defaultIdx : 0;
                       });
                     }
                   },
                   child: Row(children: [
                     Icon(Icons.add, size: sw * 0.043, color: kPrimary),
                     SizedBox(width: sw * 0.011),
-                    Text(
-                      'Add New',
-                      style: TextStyle(
-                          color: kPrimary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: sw * 0.037),
-                    ),
+                    Text('Add New',
+                        style: TextStyle(
+                            color: kPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: sw * 0.037)),
                   ]),
                 ),
               ],
             ),
             SizedBox(height: sh * 0.012),
-
-            // Address list or empty state
             Expanded(
               child: addresses.isEmpty
                   ? Center(
@@ -456,19 +490,16 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                     Icon(Icons.location_off_outlined,
                         size: sw * 0.133, color: Colors.grey),
                     SizedBox(height: sh * 0.012),
-                    Text(
-                      'No saved addresses',
-                      style: TextStyle(
-                          fontSize: sw * 0.040,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w500),
-                    ),
+                    Text('No saved addresses',
+                        style: TextStyle(
+                            fontSize: sw * 0.040,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500)),
                     SizedBox(height: sh * 0.006),
-                    Text(
-                      'Tap "Add New" above to add one',
-                      style: TextStyle(
-                          fontSize: sw * 0.032, color: Colors.grey),
-                    ),
+                    Text('Tap "Add New" above to add one',
+                        style: TextStyle(
+                            fontSize: sw * 0.032,
+                            color: Colors.grey)),
                   ],
                 ),
               )
@@ -484,7 +515,8 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                       Navigator.pop(context);
                     },
                     child: Container(
-                      margin: EdgeInsets.only(bottom: sh * 0.010),
+                      margin:
+                      EdgeInsets.only(bottom: sh * 0.010),
                       padding: EdgeInsets.all(sw * 0.035),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
@@ -499,7 +531,8 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                             : Colors.white,
                       ),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment:
+                        CrossAxisAlignment.start,
                         children: [
                           Icon(
                             addr.type == 'Home'
@@ -519,28 +552,27 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                               CrossAxisAlignment.start,
                               children: [
                                 Row(children: [
-                                  Text(
-                                    addr.name,
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: sw * 0.037),
-                                  ),
+                                  Text(addr.name,
+                                      style: TextStyle(
+                                          fontWeight:
+                                          FontWeight.w600,
+                                          fontSize: sw * 0.037)),
                                   SizedBox(width: sw * 0.016),
                                   Container(
                                     padding: EdgeInsets.symmetric(
                                         horizontal: sw * 0.013,
                                         vertical: sh * 0.002),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFE0E0E0),
+                                      color:
+                                      const Color(0xFFE0E0E0),
                                       borderRadius:
                                       BorderRadius.circular(4),
                                     ),
-                                    child: Text(
-                                      addr.type,
-                                      style: TextStyle(
-                                          fontSize: sw * 0.027,
-                                          fontWeight: FontWeight.w600),
-                                    ),
+                                    child: Text(addr.type,
+                                        style: TextStyle(
+                                            fontSize: sw * 0.027,
+                                            fontWeight:
+                                            FontWeight.w600)),
                                   ),
                                   if (addr.isDefault) ...[
                                     SizedBox(width: sw * 0.011),
@@ -549,39 +581,37 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                                           horizontal: sw * 0.013,
                                           vertical: sh * 0.002),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF0A832A),
+                                        color:
+                                        const Color(0xFF0A832A),
                                         borderRadius:
-                                        BorderRadius.circular(4),
+                                        BorderRadius.circular(
+                                            4),
                                       ),
-                                      child: Text(
-                                        'DEFAULT',
-                                        style: TextStyle(
-                                            fontSize: sw * 0.024,
-                                            color: Colors.white,
-                                            fontWeight:
-                                            FontWeight.w600),
-                                      ),
+                                      child: Text('DEFAULT',
+                                          style: TextStyle(
+                                              fontSize: sw * 0.024,
+                                              color: Colors.white,
+                                              fontWeight:
+                                              FontWeight.w600)),
                                     ),
                                   ],
                                 ]),
                                 SizedBox(height: sh * 0.004),
-                                Text(
-                                  addr.shortAddress,
-                                  style: TextStyle(
-                                      fontSize: sw * 0.032,
-                                      color: const Color(0xFF555555)),
-                                ),
+                                Text(addr.shortAddress,
+                                    style: TextStyle(
+                                        fontSize: sw * 0.032,
+                                        color: const Color(
+                                            0xFF555555))),
                                 SizedBox(height: sh * 0.002),
                                 Text(
-                                  '+91 ${_formatPhone(addr.phone)}',
-                                  style: TextStyle(
-                                      fontSize: sw * 0.030,
-                                      color: const Color(0xFF777777)),
-                                ),
+                                    '+91 ${_formatPhone(addr.phone)}',
+                                    style: TextStyle(
+                                        fontSize: sw * 0.030,
+                                        color: const Color(
+                                            0xFF777777))),
                               ],
                             ),
                           ),
-                          // Selected radio indicator
                           Radio<int>(
                             value: index,
                             groupValue: _selectedIndex,
@@ -627,25 +657,60 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                     height: sw * 0.213,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Color(0xFF897F7F)),
+                      border: Border.all(color: const Color(0xFF897F7F)),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.asset(
+                      child: item.imagePath.startsWith('http')
+                          ? Image.network(
                         item.imagePath,
                         fit: BoxFit.contain,
+                        loadingBuilder: (_, child, progress) =>
+                        progress == null
+                            ? child
+                            : const Center(
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF4256D3))),
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(
+                              Icons.image_not_supported_outlined,
+                              color: Colors.grey),
+                        ),
+                      )
+                          : Image.asset(
+                        item.imagePath,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(
+                              Icons.image_not_supported_outlined,
+                              color: Colors.grey),
+                        ),
                       ),
                     ),
                   ),
                   SizedBox(height: sh * 0.01),
-                  if (!item.outOfStock)
+                  // In buy-now mode, qty selector is read-only (qty is always 1)
+                  if (!item.outOfStock && widget.buyNowItem == null)
                     Padding(
                       padding: EdgeInsets.only(left: sw * 0.025),
                       child: _buildQtySelector(item, sw, sh),
                     ),
+                  if (!item.outOfStock && widget.buyNowItem != null)
+                    Padding(
+                      padding: EdgeInsets.only(
+                          left: sw * 0.025, top: sh * 0.005),
+                      child: Text(
+                        'Qty: ${item.qty}',
+                        style: TextStyle(
+                            fontSize: sw * 0.03,
+                            color: const Color(0xFF555555)),
+                      ),
+                    ),
                   if (item.deliveryDate != null)
                     Padding(
-                      padding: EdgeInsets.only(top: sh * 0.007, left: sw * 0.025),
+                      padding: EdgeInsets.only(
+                          top: sh * 0.007, left: sw * 0.025),
                       child: Text(
                         item.deliveryDate!,
                         maxLines: 1,
@@ -679,11 +744,13 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      ...List.generate(5, (i) => Icon(
-                        i < 4 ? Icons.star : Icons.star_half,
-                        size: sw * 0.045,
-                        color: const Color(0xFFCEC01D),
-                      )),
+                      ...List.generate(
+                          5,
+                              (i) => Icon(
+                            i < 4 ? Icons.star : Icons.star_half,
+                            size: sw * 0.045,
+                            color: const Color(0xFFCEC01D),
+                          )),
                       SizedBox(width: sw * 0.05),
                       Text(
                         '4.3 (128 reviews)',
@@ -700,29 +767,31 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                     runSpacing: sh * 0.004,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: sw * 0.013,
-                          vertical: sh * 0.001,
-                        ),
-                        child: Text(
-                          '${item.discountPercent}% OFF',
-                          style: TextStyle(
-                            color: Color(0xFF52B157),
-                            fontSize: sw * 0.034,
-                            fontWeight: FontWeight.w400,
+                      if (item.discountPercent > 0)
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: sw * 0.013,
+                            vertical: sh * 0.001,
+                          ),
+                          child: Text(
+                            '${item.discountPercent}% OFF',
+                            style: TextStyle(
+                              color: const Color(0xFF52B157),
+                              fontSize: sw * 0.034,
+                              fontWeight: FontWeight.w400,
+                            ),
                           ),
                         ),
-                      ),
-                      Text(
-                        '₹${item.originalPrice.toInt()}',
-                        style: TextStyle(
-                            fontSize: sw * 0.034,
-                            color: const Color(0xFF9F9F9F),
-                            decoration: TextDecoration.lineThrough,
-                            decorationColor: Color(0xFF9F9F9F)
+                      if (item.originalPrice != item.price)
+                        Text(
+                          '₹${item.originalPrice.toInt()}',
+                          style: TextStyle(
+                              fontSize: sw * 0.034,
+                              color: const Color(0xFF9F9F9F),
+                              decoration: TextDecoration.lineThrough,
+                              decorationColor:
+                              const Color(0xFF9F9F9F)),
                         ),
-                      ),
                       Text(
                         '₹${item.price.toInt()}',
                         style: TextStyle(
@@ -757,8 +826,8 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
             5,
                 (i) => PopupMenuItem<int>(
               value: i + 1,
-
-              child: Text('${i + 1}', style: TextStyle(fontSize: sw * 0.035)),
+              child:
+              Text('${i + 1}', style: TextStyle(fontSize: sw * 0.035)),
             ),
           ),
         );
@@ -766,24 +835,24 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
       },
       child: Container(
         padding: EdgeInsets.symmetric(
-            horizontal: sw * 0.010,
-            vertical: sh * 0.003
-        ),
+            horizontal: sw * 0.010, vertical: sh * 0.003),
         decoration: BoxDecoration(
-          border: Border.all(color: Color(0xFF555555)),
+          border: Border.all(color: const Color(0xFF555555)),
           borderRadius: BorderRadius.circular(2),
           color: Colors.white,
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text('Qty: ${item.qty}',
+          Text(
+            'Qty: ${item.qty}',
             style: TextStyle(
-              color: Color(0xFF555555),
+              color: const Color(0xFF555555),
               fontSize: sw * 0.03,
               fontWeight: FontWeight.w400,
             ),
           ),
           SizedBox(width: sw * 0.010),
-          Icon(Icons.arrow_drop_down, size: sw * 0.043, color: Color(0xFF555555),),
+          Icon(Icons.arrow_drop_down,
+              size: sw * 0.043, color: const Color(0xFF555555)),
         ]),
       ),
     );
@@ -806,14 +875,14 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                   dashLength: 4,
                   dashGapLength: 3,
                   lineThickness: 1,
-                  dashColor: Color(0xFF555555)),
+                  dashColor: const Color(0xFF555555)),
               SizedBox(height: sh * 0.012),
               Row(children: [
                 Text('Fees', style: TextStyle(fontSize: sw * 0.04)),
                 SizedBox(width: sw * 0.011),
                 GestureDetector(
-                  onTap: () =>
-                      setState(() => _showFeeBreakdown = !_showFeeBreakdown),
+                  onTap: () => setState(
+                          () => _showFeeBreakdown = !_showFeeBreakdown),
                   child: Icon(
                       _showFeeBreakdown
                           ? Icons.keyboard_arrow_up
@@ -829,22 +898,24 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                   padding: EdgeInsets.only(top: sh * 0.007),
                   child: Text('Platform fee',
                       style: TextStyle(
-                          fontSize: sw * 0.035, color: Color(0xFF555555))),
+                          fontSize: sw * 0.035,
+                          color: const Color(0xFF555555))),
                 ),
               SizedBox(height: sh * 0.012),
               DottedLine(
                   dashLength: 4,
                   dashGapLength: 3,
                   lineThickness: 1,
-                  dashColor: Color(0xFF555555)),
+                  dashColor: const Color(0xFF555555)),
               SizedBox(height: sh * 0.012),
               Row(children: [
-                Text('Discount', style: TextStyle(fontSize: sw * 0.04)),
+                Text('Discount',
+                    style: TextStyle(fontSize: sw * 0.04)),
                 const Spacer(),
                 Text('-₹${_discount.toInt()}',
                     style: TextStyle(
                         fontSize: sw * 0.04,
-                        color: Color(0xFF41A900),
+                        color: const Color(0xFF41A900),
                         fontWeight: FontWeight.w600)),
               ]),
               SizedBox(height: sh * 0.012),
@@ -852,16 +923,13 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                   dashLength: 4,
                   dashGapLength: 3,
                   lineThickness: 1,
-                  dashColor: Color(0xFF555555)),
+                  dashColor: const Color(0xFF555555)),
               SizedBox(height: sh * 0.012),
               Row(children: [
                 Text('Total Amount',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: sw * 0.04,
-                  ),
-
-                ),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: sw * 0.04)),
                 const Spacer(),
                 Text('₹${_total.toInt()}',
                     style: TextStyle(
@@ -879,13 +947,12 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Image.asset('assets/picture/correct.png',
-                        height: 20,
-                      ),
+                          height: 20),
                       SizedBox(width: sw * 0.016),
                       Text(
                         "You'll save ₹${_savings.toInt()} on this order",
                         style: TextStyle(
-                            color: Color(0xFF046B09),
+                            color: const Color(0xFF046B09),
                             fontWeight: FontWeight.w400,
                             fontSize: sw * 0.037),
                       ),
@@ -923,7 +990,7 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
         child: RichText(
           text: TextSpan(
             style: TextStyle(
-              fontFamily: 'Poppins',
+                fontFamily: 'Poppins',
                 fontSize: sw * 0.033,
                 color: const Color(0xFF666666),
                 height: 1.8),
@@ -931,7 +998,8 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
               const TextSpan(
                   text:
                   'By continuing with the order, you confirm that you are above 18 '),
-              const TextSpan(text: "years of age, and you agree to Aura's "),
+              const TextSpan(
+                  text: "years of age, and you agree to Aura's "),
               TextSpan(
                 text: 'Terms of Use',
                 style: TextStyle(
@@ -984,36 +1052,49 @@ class _Order_Summary_CategoryState extends State<Order_Summary_Category> {
                       color: const Color(0xff000000)),
                 ),
                 SizedBox(width: sw * 0.011),
-                Image.asset('assets/picture/info.png',
-                  height: sh * 0.019,
-                )
+                Image.asset('assets/picture/info.png', height: sh * 0.019),
               ]),
             ],
           ),
           const Spacer(),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFFF4E219),
+              backgroundColor: const Color(0xFFF4E219),
               padding: EdgeInsets.symmetric(
                   horizontal: sw * 0.05, vertical: sh * 0.005),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(6)),
             ),
-            onPressed: cartItems.isEmpty
-                ? null
-                : () => // In _buildBottomBar's onPressed:
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => Payment_Category(
-                  totalAmount: _total,
-                  mrpTotal: _mrpTotal,   // ← add
-                  discount: _discount,   // ← add
-                  fees: _fees,           // ← add
-                  source: widget.source,
+            onPressed: () {
+              // Guard: must have a saved address before proceeding to payment
+              if (_store.addresses.isEmpty) {
+                ScaffoldMessenger.of(context).clearSnackBars();
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Please add a delivery address to proceed',
+                    ),
+                    duration: Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+
+                return;
+              }
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => Payment_Category(
+                    totalAmount: _total,
+                    mrpTotal: _mrpTotal,
+                    discount: _discount,
+                    fees: _fees,
+                    source: widget.source,
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
             child: Text(
               'Continue',
               style: TextStyle(

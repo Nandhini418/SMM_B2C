@@ -1,17 +1,155 @@
 import 'package:flutter/material.dart';
+import 'package:smm_power/service/category_api_service.dart';
+import 'package:smm_power/category/product_details.dart'; // <-- import the new details screen
+
+// ══════════════════════════════════════════════════════
+//  CATEGORY SCREEN  —  API Bound Version  (with product navigation)
+// ══════════════════════════════════════════════════════
 
 class CategoryScreen extends StatefulWidget {
   final VoidCallback? onBack;
-  const CategoryScreen({super.key, this.onBack});
+
+  /// When coming from HomeScreen, pass the category id to jump directly to it.
+  /// If null, the first category in the list is selected by default.
+  final int? initialCategoryId;
+
+  const CategoryScreen({
+    super.key,
+    this.onBack,
+    this.initialCategoryId,
+  });
 
   @override
   State<CategoryScreen> createState() => _CategoryScreenState();
 }
 
 class _CategoryScreenState extends State<CategoryScreen> {
+  // ── State ────────────────────────────────────────────
   int _selectedSideIndex = 0;
   int _selectedSortIndex = 0;
 
+  // Left sidebar data (TYPE 100)
+  List<SideCategoryModel> _sideCategories = [];
+  bool _isSideLoading = true;
+  String? _sideError;
+
+  // Right content data (TYPE 101)
+  List<SubCategoryItemModel> _subItems = [];
+  bool _isContentLoading = false;
+  String? _contentError;
+
+  // ── Lifecycle ─────────────────────────────────────────
+  @override
+  void initState() {
+    super.initState();
+    _loadSideCategories();
+  }
+
+  // ── API Calls ─────────────────────────────────────────
+
+  Future<void> _loadSideCategories() async {
+    // ⚡ Cache warm (preloaded at login) → show instantly, zero wait
+    if (CategoryCache.isSideCacheReady) {
+      final categories = CategoryCache.sideCategories;
+      int startIndex = 0;
+      if (widget.initialCategoryId != null) {
+        final found = categories.indexWhere((c) => c.id == widget.initialCategoryId);
+        if (found != -1) startIndex = found;
+      }
+      setState(() {
+        _sideCategories    = categories;
+        _selectedSideIndex = startIndex;
+        _isSideLoading     = false;
+      });
+      if (categories.isNotEmpty) _loadSubCategoryItems(categories[startIndex].id);
+      return;
+    }
+
+    // Cold start — only if preloadAll() wasn't called yet
+    setState(() {
+      _isSideLoading = true;
+      _sideError = null;
+    });
+
+    try {
+      final categories = await CategoryApiService.fetchSideCategories();
+
+      int startIndex = 0;
+      if (widget.initialCategoryId != null) {
+        final found = categories.indexWhere(
+              (c) => c.id == widget.initialCategoryId,
+        );
+        if (found != -1) startIndex = found;
+      }
+
+      setState(() {
+        _sideCategories = categories;
+        _selectedSideIndex = startIndex;
+        _isSideLoading = false;
+      });
+
+      if (categories.isNotEmpty) {
+        _loadSubCategoryItems(categories[startIndex].id);
+      }
+    } catch (e) {
+      print('❌ Side Categories Error: $e');
+      setState(() {
+        _isSideLoading = false;
+        _sideError = e.toString();
+      });
+    }
+  }
+
+  Future<void> _loadSubCategoryItems(int subCategoryId) async {
+    // ⚡ Cache warm → show instantly, no spinner at all
+    if (CategoryCache.isSubCachReady(subCategoryId)) {
+      setState(() {
+        _subItems         = CategoryCache.getSubItems(subCategoryId);
+        _isContentLoading = false;
+        _contentError     = null;
+      });
+      return;
+    }
+
+    // Cold start — fetch from network
+    setState(() {
+      _isContentLoading = true;
+      _contentError = null;
+      _subItems = [];
+    });
+
+    try {
+      final items =
+      await CategoryApiService.fetchSubCategoryItems(subCategoryId);
+      setState(() {
+        _subItems = items;
+        _isContentLoading = false;
+      });
+    } catch (e) {
+      print('❌ Sub-Category Items Error: $e');
+      setState(() {
+        _isContentLoading = false;
+        _contentError = e.toString();
+      });
+    }
+  }
+
+  // ── Navigate to Product Details ───────────────────────
+  void _openProductDetail(SubCategoryItemModel item) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductDetailsScreen(
+          productId: item.id,
+          // Pass the product name so the AppBar title is shown
+          // immediately while the API loads — avoids blank title.
+          productName: item.productName,
+        ),
+      ),
+    );
+  }
+
+  // ── Sort Bottom Sheet ─────────────────────────────────
   void _showSortBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -29,8 +167,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-
-                  // 🔹 Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -47,17 +183,13 @@ class _CategoryScreenState extends State<CategoryScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 10),
-
-                  // 🔹 Options
                   _buildSortTile("Relevance", 0, setModalState),
                   _buildSortTile("Discount", 1, setModalState),
                   _buildSortTile("Price (lowest first)", 2, setModalState),
                   _buildSortTile("Whats New", 3, setModalState),
                   _buildSortTile("Price (Highest first)", 4, setModalState),
                   _buildSortTile("Ratings", 5, setModalState),
-
                   const SizedBox(height: 10),
                 ],
               ),
@@ -71,21 +203,14 @@ class _CategoryScreenState extends State<CategoryScreen> {
   Widget _buildSortTile(String title, int index, Function setModalState) {
     return InkWell(
       onTap: () {
-        setModalState(() {
-          _selectedSortIndex = index;
-        });
-
+        setModalState(() => _selectedSortIndex = index);
         Navigator.pop(context);
-
-        // 👉 Apply sorting logic here if needed
-        print("Selected: $title");
+        print("✅ Sort Selected: $title");
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: [
-
-            // 🔘 Custom radio circle
             Container(
               width: 20,
               height: 20,
@@ -106,148 +231,15 @@ class _CategoryScreenState extends State<CategoryScreen> {
               )
                   : null,
             ),
-
             const SizedBox(width: 12),
-
-            Text(
-              title,
-              style: const TextStyle(fontSize: 16),
-            ),
+            Text(title, style: const TextStyle(fontSize: 16)),
           ],
         ),
       ),
     );
   }
 
-  final List<_SideCategory> _sideCategories = const [
-    _SideCategory(label: 'POPULAR', image: 'assets/category/star.png', color: Color(0xFF2E7D32)),
-    _SideCategory(label: 'FLYING CRANE', image: 'assets/home/flying_crane.png', color: Color(0xFF1565C0)),
-    _SideCategory(label: 'SOLAR BOLLARD', image: 'assets/home/image_1.png', color: Color(0xFF2E7D32)),
-    _SideCategory(label: 'SOLAR POST TOP LIGHT', image: 'assets/home/solar_post.png', color: Color(0xFF388E3C)),
-    _SideCategory(label: 'SOLAR WITH CCTV', image: 'assets/category/solar_cctv.png', color: Color(0xFF2E7D32)),
-    _SideCategory(label: 'SOLAR WALL LIGHT', image: 'assets/category/solar_wall_light.png', color: Color(0xFF7B1FA2)),
-    _SideCategory(label: 'SOLAR WIND HYBRID', image: 'assets/category/solar_hybrid.png', color: Color(0xFF0288D1)),
-    _SideCategory(label: 'SOLAR SERIES PRODUCTS', image: 'assets/category/solar_series.png', color: Color(0xFF558B2F)),
-  ];
-
-  final List<_CategoryContent> _contents = const [
-    _CategoryContent(
-      sections: [
-        _ContentSection(
-          title: 'Features On SMM',
-          items: [
-            _ContentItem(label: 'SOLAR WITH\nCCTV', image: 'assets/category/solar_cctv.png'),
-            _ContentItem(label: 'FLYING\nCRANE', image: 'assets/home/flying_crane.png'),
-            _ContentItem(label: 'SOLAR WIND\nHYBRID', image: 'assets/category/solar_hybrid.png'),
-            _ContentItem(label: 'SOLAR SERIES\nPRODUCTS', image: 'assets/category/solar_series.png'),
-            _ContentItem(label: 'SOLAR POST\nTOP LIGHT', image: 'assets/home/solar_post.png'),
-            _ContentItem(label: 'VIEW ALL', image: 'assets/category/view.jpg'),
-          ],
-        ),
-        _ContentSection(
-          title: 'All Popular',
-          items: [
-            _ContentItem(label: 'SOLAR BOLLARD', image: 'assets/home/image_1.png'),
-            _ContentItem(label: 'SOLAR WALL\nLIGHT', image: 'assets/category/solar_wall_light.png'),
-            _ContentItem(label: 'SOLAR WIND\nHYBRID', image: 'assets/category/solar_hybrid.png'),
-            _ContentItem(label: 'SOLAR SERIES\nPRODUCTS', image: 'assets/category/solar_series.png'),
-            _ContentItem(label: 'SOLAR POST\nTOP LIGHT', image: 'assets/home/solar_post.png'),
-          ],
-        ),
-        _ContentSection(
-          title: 'Flying Crane',
-          items: [
-            _ContentItem(label: 'FLYING CRANE\nPRODUCT 1', image: 'assets/category/flying_crane_1.png'),
-            _ContentItem(label: 'FLYING CRANE\nPRODUCT 2', image: 'assets/category/flying_crane_2.png'),
-            _ContentItem(label: 'FLYING CRANE\nPRODUCT 3', image: 'assets/category/flying_crane_4.png'),
-            _ContentItem(label: 'FLYING CRANE\nPRODUCT 4', image: 'assets/category/flying_crane_4.png'),
-            _ContentItem(label: 'FLYING CRANE\nPRODUCT 5', image: 'assets/home/flying_crane.png'),
-          ],
-        ),
-      ],
-    ),
-    _CategoryContent(
-      sections: [
-        _ContentSection(
-          title: 'Flying Crane',
-          items: [
-            _ContentItem(label: 'FLYING CRANE\nPRODUCT 1', image: 'assets/category/flying_crane_1.png'),
-            _ContentItem(label: 'FLYING CRANE\nPRODUCT 2', image: 'assets/category/flying_crane_2.png'),
-            _ContentItem(label: 'FLYING CRANE\nPRODUCT 3', image: 'assets/category/flying_crane_4.png'),
-            _ContentItem(label: 'FLYING CRANE\nPRODUCT 4', image: 'assets/category/flying_crane_3.png'),
-          ],
-        ),
-      ],
-    ),
-    _CategoryContent(
-      sections: [
-        _ContentSection(
-          title: 'Solar Bollard',
-          items: [
-            _ContentItem(label: 'SOLAR BOLLARD\nLIGHT 1', image: 'assets/home/bollard.png'),
-            _ContentItem(label: 'SOLAR BOLLARD\nLIGHT 2', image: 'assets/items/solar_bollard.jpg'),
-            _ContentItem(label: 'SOLAR BOLLARD\nLIGHT 3', image: 'assets/home/image_3.png'),
-          ],
-        ),
-      ],
-    ),
-    _CategoryContent(
-      sections: [
-        _ContentSection(
-          title: 'Solar Post Top Light',
-          items: [
-            _ContentItem(label: 'SOLAR POST\nTOP LIGHT 1', image: 'assets/items/solar_top_1.jpg'),
-            _ContentItem(label: 'SOLAR POST\nTOP LIGHT 3', image: 'assets/items/solar_top_3.jpg'),
-            _ContentItem(label: 'SOLAR POST\nTOP LIGHT 2', image: 'assets/items/solar_top_2.jpg'),
-          ],
-        ),
-      ],
-    ),
-    _CategoryContent(
-      sections: [
-        _ContentSection(
-          title: 'Solar with CCTV',
-          items: [
-            _ContentItem(label: 'SOLAR WITH\nCCTV 1', image: 'assets/items/solar_cctv_1.jpg'),
-            _ContentItem(label: 'SOLAR WITH\nCCTV 2', image: 'assets/items/solar_cctv_2.jpg'),
-          ],
-        ),
-      ],
-    ),
-    _CategoryContent(
-      sections: [
-        _ContentSection(
-          title: 'Solar Wall Light',
-          items: [
-            _ContentItem(label: 'SOLAR WALL\nLIGHT 1', image: 'assets/items/solar_wall_light_1.jpg'),
-            _ContentItem(label: 'SOLAR WALL\nLIGHT 2', image: 'assets/items/solar_wall_light_2.jpg'),
-          ],
-        ),
-      ],
-    ),
-    _CategoryContent(
-      sections: [
-        _ContentSection(
-          title: 'SOLAR WIND HYBRID',
-          items: [
-            _ContentItem(label: 'SOLAR WIND', image: 'assets/category/solar_hybrid.png'),
-          ],
-        ),
-      ],
-    ),
-    _CategoryContent(
-      sections: [
-        _ContentSection(
-          title: 'SOLAR SERIES PRODUCTS',
-          items: [
-            _ContentItem(label: 'FL SERIES ', image: 'assets/category/solar_series_1.jpg'),
-            _ContentItem(label: 'MHL SERIES', image: 'assets/category/mhl.jpg'),
-          ],
-        ),
-      ],
-    ),
-  ];
-
+  // ── Build ─────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -257,7 +249,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(sh * 0.069), // ~56
+        preferredSize: Size.fromHeight(sh * 0.069),
         child: Container(
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -266,7 +258,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 color: Color(0x1A000000),
                 offset: Offset(0, 4),
                 blurRadius: 6,
-                spreadRadius: 0,
               ),
             ],
           ),
@@ -277,7 +268,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 children: [
                   IconButton(
                     icon: Icon(Icons.arrow_back,
-                        color: const Color(0xFF000000), size: sw * 0.064),
+                        color: Colors.black, size: sw * 0.064),
                     onPressed: () {
                       if (widget.onBack != null) {
                         widget.onBack!();
@@ -290,7 +281,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   Text(
                     'Categories',
                     style: TextStyle(
-                      color: const Color(0xFF000000),
+                      color: Colors.black,
                       fontSize: sw * 0.045,
                       fontWeight: FontWeight.w500,
                     ),
@@ -300,23 +291,24 @@ class _CategoryScreenState extends State<CategoryScreen> {
                     children: [
                       GestureDetector(
                         onTap: () {},
-                        child: Icon(Icons.search, size: sw * 0.06, color: Colors.black,),
+                        child: Icon(Icons.search,
+                            size: sw * 0.06, color: Colors.black),
                       ),
                       SizedBox(width: sw * 0.03),
-
                       GestureDetector(
                         onTap: () {},
-                        child: Icon(Icons.favorite_border, size: sw * 0.06, color: Colors.black,),
+                        child: Icon(Icons.favorite_border,
+                            size: sw * 0.06, color: Colors.black),
                       ),
                       SizedBox(width: sw * 0.03),
-
                       GestureDetector(
                         onTap: () {},
-                        child: Icon(Icons.shopping_cart_outlined, size: sw * 0.06, color: Colors.black,),
+                        child: Icon(Icons.shopping_cart_outlined,
+                            size: sw * 0.06, color: Colors.black),
                       ),
                       SizedBox(width: sw * 0.02),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
@@ -324,29 +316,37 @@ class _CategoryScreenState extends State<CategoryScreen> {
         ),
       ),
       body: SafeArea(
-        child: Column(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSidebar(sw, sh),
-                  Expanded(child: _buildContent(sw, sh)),
-                ],
-              ),
-            ),
+            _buildSidebar(sw, sh),
+            Expanded(child: _buildContent(sw, sh)),
           ],
         ),
       ),
     );
   }
 
-  // ── LEFT SIDEBAR ──────────────────────────────────
+  // ── LEFT SIDEBAR (TYPE 100 data) ──────────────────────
   Widget _buildSidebar(double sw, double sh) {
     return Container(
-      width: sw * 0.219, // ~82
+      width: sw * 0.219,
       color: const Color(0xFFE5FFE7),
-      child: ListView.builder(
+      child: _isSideLoading
+          ? const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(
+            color: Color(0xFF2E7D32),
+            strokeWidth: 2,
+          ),
+        ),
+      )
+          : _sideError != null
+          ? _buildSideError(sw)
+          : _sideCategories.isEmpty
+          ? _buildSideEmpty(sw)
+          : ListView.builder(
         padding: EdgeInsets.zero,
         itemCount: _sideCategories.length,
         itemBuilder: (ctx, i) {
@@ -354,17 +354,25 @@ class _CategoryScreenState extends State<CategoryScreen> {
           final isSelected = i == _selectedSideIndex;
 
           return GestureDetector(
-            onTap: () => setState(() => _selectedSideIndex = i),
+            onTap: () {
+              setState(() => _selectedSideIndex = i);
+              _loadSubCategoryItems(cat.id);
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white : const Color(0xFFE5FFE7),
+                color: isSelected
+                    ? Colors.white
+                    : const Color(0xFFE5FFE7),
                 border: Border(
                   left: BorderSide(
-                    color: isSelected ? const Color(0xFF2E7D32) : Colors.transparent,
+                    color: isSelected
+                        ? const Color(0xFF2E7D32)
+                        : Colors.transparent,
                     width: 3,
                   ),
-                  bottom: const BorderSide(color: Color(0xFF4256D3)),
+                  bottom: const BorderSide(
+                      color: Color(0xFF4256D3)),
                 ),
               ),
               padding: EdgeInsets.symmetric(
@@ -375,7 +383,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: sw * 0.139,  // ~52
+                    width: sw * 0.139,
                     height: sw * 0.139,
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -383,25 +391,29 @@ class _CategoryScreenState extends State<CategoryScreen> {
                       boxShadow: isSelected
                           ? [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.10),
+                          color: Colors.black
+                              .withOpacity(0.10),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
                       ]
                           : [],
                     ),
-                    child: Padding(
-                      padding: EdgeInsets.all(i == 0 ? 4 : sw * 0.027),
-                      child: Transform.scale(
-                        scale: i == 0 ? 0.8 : 1.2,
-                        child: ClipOval(
-                          child: Image.asset(
-                            cat.image,
-                            width: sw * 0.139,
-                            height: sw * 0.139,
-                            fit: BoxFit.contain,
-                          ),
+                    child: ClipOval(
+                      child: cat.image.isNotEmpty
+                          ? Image.network(
+                        cat.image,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Icon(
+                          Icons.category,
+                          size: sw * 0.07,
+                          color: const Color(0xFF4256D3),
                         ),
+                      )
+                          : Icon(
+                        Icons.category,
+                        size: sw * 0.07,
+                        color: const Color(0xFF4256D3),
                       ),
                     ),
                   ),
@@ -411,7 +423,9 @@ class _CategoryScreenState extends State<CategoryScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: sw * 0.029,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w400,
                       color: const Color(0xFF4256D3),
                       height: 1.2,
                     ),
@@ -425,17 +439,54 @@ class _CategoryScreenState extends State<CategoryScreen> {
     );
   }
 
-  // ── RIGHT CONTENT ─────────────────────────────────
-  Widget _buildContent(double sw, double sh) {
-    final content = _contents[_selectedSideIndex];
+  Widget _buildSideError(double sw) {
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, color: Colors.red, size: sw * 0.08),
+          const SizedBox(height: 6),
+          Text(
+            'Failed to load',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: sw * 0.027, color: Colors.red),
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: _loadSideCategories,
+            child: Text(
+              'Retry',
+              style: TextStyle(
+                fontSize: sw * 0.027,
+                color: const Color(0xFF4256D3),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildSideEmpty(double sw) {
+    return Center(
+      child: Text(
+        'No categories',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: sw * 0.027, color: Colors.grey),
+      ),
+    );
+  }
+
+  // ── RIGHT CONTENT (TYPE 101 data) ─────────────────────
+  Widget _buildContent(double sw, double sh) {
     return Container(
       color: const Color(0xFFF5F5F5),
       child: ListView(
         padding: EdgeInsets.all(sw * 0.032),
         children: [
-
-          // ✅ SORT BY (ONLY ONCE AT TOP)
+          // Sort By
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -453,7 +504,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   child: Row(
                     children: [
                       Icon(Icons.swap_vert,
-                          size: sw * 0.045, color: Color(0xFF4256D3)),
+                          size: sw * 0.045, color: const Color(0xFF4256D3)),
                       SizedBox(width: sw * 0.01),
                       Text(
                         "Sort By",
@@ -470,48 +521,104 @@ class _CategoryScreenState extends State<CategoryScreen> {
             ],
           ),
 
-          SizedBox(height: sh * 0.005),
+          SizedBox(height: sh * 0.012),
 
-          // ❗ Sections (loop manually instead of builder)
-          ...content.sections.map((section) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // Section title
+          if (_sideCategories.isNotEmpty)
+            Row(
               children: [
-                SizedBox(height: sh * 0.012),
-
-                // Section Title
-                Row(
-                  children: [
-                    Text(
-                      section.title,
-                      style: TextStyle(
-                        fontSize: sw * 0.037,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1A1A1A),
-                      ),
-                    ),
-                    SizedBox(width: sw * 0.021),
-                    Expanded(
-                      child: Container(
-                          height: 1, color: const Color(0xFF868282)),
-                    ),
-                  ],
+                Text(
+                  _sideCategories[_selectedSideIndex].label,
+                  style: TextStyle(
+                    fontSize: sw * 0.037,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1A1A1A),
+                  ),
                 ),
-
-                SizedBox(height: sh * 0.017),
-
-                _buildItemGrid(section.items, sw, sh),
-
-                SizedBox(height: sh * 0.025),
+                SizedBox(width: sw * 0.021),
+                Expanded(
+                  child: Container(
+                      height: 1, color: const Color(0xFF868282)),
+                ),
               ],
-            );
-          }).toList(),
+            ),
+
+          SizedBox(height: sh * 0.017),
+
+          // Content area
+          _isContentLoading
+              ? const SizedBox(
+            height: 200,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF4256D3),
+              ),
+            ),
+          )
+              : _contentError != null
+              ? _buildContentError(sw, sh)
+              : _subItems.isEmpty
+              ? _buildContentEmpty(sw, sh)
+              : _buildItemGrid(_subItems, sw, sh),
         ],
       ),
     );
   }
 
-  Widget _buildItemGrid(List<_ContentItem> items, double sw, double sh) {
+  Widget _buildContentError(double sw, double sh) {
+    return SizedBox(
+      height: sh * 0.3,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, color: Colors.red, size: sw * 0.12),
+          const SizedBox(height: 8),
+          Text(
+            'Failed to load items',
+            style: TextStyle(fontSize: sw * 0.037, color: Colors.red),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: () {
+              if (_sideCategories.isNotEmpty) {
+                _loadSubCategoryItems(
+                    _sideCategories[_selectedSideIndex].id);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4256D3),
+            ),
+            child: const Text('Retry',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContentEmpty(double sw, double sh) {
+    return SizedBox(
+      height: sh * 0.3,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inventory_2_outlined,
+                size: sw * 0.15, color: Colors.grey.shade400),
+            const SizedBox(height: 10),
+            Text(
+              'No items found',
+              style:
+              TextStyle(fontSize: sw * 0.04, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemGrid(
+      List<SubCategoryItemModel> items, double sw, double sh) {
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
@@ -520,27 +627,38 @@ class _CategoryScreenState extends State<CategoryScreen> {
         crossAxisCount: 3,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
-        childAspectRatio: 0.85,
+        childAspectRatio: 0.80,
       ),
-      itemBuilder: (ctx, i) => _ContentItemCard(item: items[i], sw: sw, sh: sh),
+      itemBuilder: (ctx, i) => GestureDetector(
+        onTap: () => _openProductDetail(items[i]),   // ← NAVIGATE on tap
+        child: _SubCategoryItemCard(
+          item: items[i],
+          sw: sw,
+          sh: sh,
+        ),
+      ),
     );
   }
 }
 
-// ── ITEM CARD ─────────────────────────────────────────
-class _ContentItemCard extends StatelessWidget {
-  final _ContentItem item;
+// ── SUB-CATEGORY ITEM CARD ────────────────────────────
+class _SubCategoryItemCard extends StatelessWidget {
+  final SubCategoryItemModel item;
   final double sw;
   final double sh;
-  const _ContentItemCard({required this.item, required this.sw, required this.sh});
+
+  const _SubCategoryItemCard({
+    required this.item,
+    required this.sw,
+    required this.sh,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isViewAll = item.label.contains("VIEW");
-
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // White circle
         Container(
           width: sw * 0.173,
           height: sw * 0.173,
@@ -555,66 +673,48 @@ class _ContentItemCard extends StatelessWidget {
               ),
             ],
           ),
-          child: Center(
-            child: isViewAll
-            // 🔥 SHOW ICON
-                ? Icon(
-              Icons.arrow_forward, // you can change icon
-              size: sw * 0.1,
-              color: const Color(0xFF4256D3),
-            )
-            // 🔥 SHOW IMAGE
-                : Padding(
-              padding: const EdgeInsets.all(4),
-              child: ClipOval(
-                child: Image.asset(
-                  item.image,
-                  fit: BoxFit.contain,
+          child: item.hasImage
+              ? ClipOval(
+            child: Image.network(
+              item.productImage!,
+              fit: BoxFit.cover,
+              loadingBuilder: (_, child, progress) => progress == null
+                  ? child
+                  : Container(color: const Color(0xFFEEEEEE)),
+              errorBuilder: (_, __, ___) => Center(
+                child: Icon(
+                  Icons.image_not_supported_outlined,
+                  size: sw * 0.08,
+                  color: const Color(0xFFBDBDBD),
                 ),
               ),
+            ),
+          )
+              : Center(
+            child: Icon(
+              Icons.image_not_supported_outlined,
+              size: sw * 0.08,
+              color: const Color(0xFFBDBDBD),
             ),
           ),
         ),
 
         SizedBox(height: sh * 0.007),
 
+        // Product name
         Text(
-          item.label,
+          item.productName,
           textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: sw * 0.027,
-            fontWeight: isViewAll ? FontWeight.w600 : FontWeight.w500,
-            color: isViewAll
-                ? const Color(0xFF4256D3)
-                : const Color(0xFF000000),
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFF000000),
+            height: 1.3,
           ),
         ),
       ],
     );
   }
-}
-
-// ── DATA MODELS ───────────────────────────────────────
-class _SideCategory {
-  final String label;
-  final String image;
-  final Color color;
-  const _SideCategory({required this.label, required this.image, required this.color});
-}
-
-class _CategoryContent {
-  final List<_ContentSection> sections;
-  const _CategoryContent({required this.sections});
-}
-
-class _ContentSection {
-  final String title;
-  final List<_ContentItem> items;
-  const _ContentSection({required this.title, required this.items});
-}
-
-class _ContentItem {
-  final String label;
-  final String image;
-  const _ContentItem({required this.label, required this.image});
 }
