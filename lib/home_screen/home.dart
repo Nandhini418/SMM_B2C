@@ -113,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: sw * 0.027, vertical: sh * 0.005),
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-                    child: Image.asset('assets/login/smm_logo.jpeg', height: sh * 0.034),
+                    child: Image.asset('assets/login/smm.png', height: sh * 0.034),
                   ),
                   const Spacer(),
                   GestureDetector(
@@ -188,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: sw * 0.021, vertical: sh * 0.004),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-                  child: Image.asset('assets/login/smm_logo.jpeg', height: sh * 0.025),
+                  child: Image.asset('assets/login/smm.png', height: sh * 0.025),
                 ),
               ),
               Positioned(

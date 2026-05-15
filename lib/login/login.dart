@@ -332,7 +332,7 @@ class _Login_PageState extends State<Login_Page> with CodeAutoFill {
                     Positioned(
                       top: -2,
                       child: Image.asset(
-                        'assets/login/smm_logo.jpeg',
+                        'assets/login/smm.png',
                         width: sw * 0.38,
                         height: sh * 0.075,
                         fit: BoxFit.contain,
