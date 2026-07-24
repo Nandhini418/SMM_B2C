@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smm_power/home_screen/qr_scanner.dart';
 import 'package:smm_power/home_screen/search_screen.dart';
 import 'package:smm_power/service/category_api_service.dart';
+import 'package:smm_power/service/product_api_service.dart';
 import 'package:smm_power/bottom_navigation/category.dart';
 import 'package:smm_power/category/product_details.dart';
 import 'package:smm_power/home_screen/notification.dart';
@@ -24,12 +25,44 @@ class _HomeScreenState extends State<HomeScreen> {
   List<SideCategoryModel> _categories = [];
   bool _isCatLoading = true;
 
+  // ── Best Selling API state ────────────────────────────
+  // Fetches sub-category items from a specific category (e.g. Capacitors)
+  // and shows the first few as "Best Selling" products.
+  List<SubCategoryItemModel> _bestSellingItems = [];
+  bool _isBestSellingLoading = true;
+
+  // ── Recommended API state ─────────────────────────────
+  // Fetches sub-category items from another category (or same) for recommendations.
+  List<SubCategoryItemModel> _recommendedItems = [];
+  bool _isRecommendedLoading = true;
+
+  // ─────────────────────────────────────────────────────
+  // CONFIGURATION — change these IDs to control which
+  // category feeds "Best Selling" and "Recommended".
+  // Once CategoryCache is warm these return instantly.
+  // ─────────────────────────────────────────────────────
+
+  /// Sub-category id whose products appear in "Best Selling"
+  static const int _bestSellingCategoryId = 1; // ← replace with your capacitor category id
+
+  /// Sub-category id whose products appear in "You Might Also Like"
+  static const int _recommendedCategoryId = 4; // ← replace with desired category id
+
+  /// How many items to show in Best Selling (horizontal scroll)
+  static const int _bestSellingLimit = 6;
+
+  /// How many items to show in Recommended (horizontal scroll)
+  static const int _recommendedLimit = 6;
+
   @override
   void initState() {
     super.initState();
     _loadCategories();
+    _loadBestSelling();
+    _loadRecommended();
   }
 
+  // ── Load sidebar categories (TYPE 100) ───────────────
   Future<void> _loadCategories() async {
     try {
       final cats = await CategoryApiService.fetchSideCategories();
@@ -40,13 +73,60 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ── Load Best Selling products (TYPE 101) ─────────────
+  Future<void> _loadBestSelling() async {
+    try {
+      final items = await CategoryApiService.fetchSubCategoryItems(_bestSellingCategoryId);
+      if (mounted) {
+        setState(() {
+          // Take up to _bestSellingLimit items
+          _bestSellingItems = items.take(_bestSellingLimit).toList();
+          _isBestSellingLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Best Selling load error: $e');
+      if (mounted) setState(() => _isBestSellingLoading = false);
+    }
+  }
+
+  // ── Load Recommended products (TYPE 101) ──────────────
+  Future<void> _loadRecommended() async {
+    try {
+      final items = await CategoryApiService.fetchSubCategoryItems(_recommendedCategoryId);
+      if (mounted) {
+        setState(() {
+          // Take up to _recommendedLimit items
+          _recommendedItems = items.take(_recommendedLimit).toList();
+          _isRecommendedLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Recommended load error: $e');
+      if (mounted) setState(() => _isRecommendedLoading = false);
+    }
+  }
+
   // ── Navigate to CategoryScreen pre-selecting a category ──
   void _openCategory(SideCategoryModel cat) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => CategoryScreen(
-          initialCategoryId: cat.id,   // ← tells CategoryScreen which to select
+          initialCategoryId: cat.id,
+        ),
+      ),
+    );
+  }
+
+  // ── Navigate to ProductDetailsScreen from a SubCategoryItemModel ──
+  void _openProductFromItem(SubCategoryItemModel item) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductDetailsScreen(
+          productId: item.id,
+          productName: item.productName,
         ),
       ),
     );
@@ -77,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
             SizedBox(height: sh * 0.203),
-            _buildCategoriesSection(sw, sh),   // ← now API-driven
+            _buildCategoriesSection(sw, sh),
             SizedBox(height: sh * 0.025),
             _buildBestSellingSection(sw, sh),
             SizedBox(height: sh * 0.025),
@@ -221,13 +301,11 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Categories', style: TextStyle(fontSize: sw * 0.045, fontWeight: FontWeight.w700)),
               GestureDetector(
-                // "View All" → opens CategoryScreen at first category (default)
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const CategoryScreen()),
@@ -248,24 +326,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
           SizedBox(height: sh * 0.017),
 
-          // ── Horizontally scrollable category cards ──
           SizedBox(
-            height: sh * 0.123, // matches original card height
+            height: sh * 0.123,
             child: _isCatLoading
-
-            // Loading shimmer row
                 ? ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: 5,
               separatorBuilder: (_, __) => SizedBox(width: sw * 0.027),
               itemBuilder: (_, __) => _ShimmerCategoryCard(sw: sw, sh: sh),
             )
-
-            // Empty fallback
                 : _categories.isEmpty
                 ? Center(child: Text('No categories', style: TextStyle(color: Colors.grey, fontSize: sw * 0.035)))
-
-            // Real data
                 : ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _categories.length,
@@ -273,7 +344,7 @@ class _HomeScreenState extends State<HomeScreen> {
               itemBuilder: (ctx, i) {
                 final cat = _categories[i];
                 return GestureDetector(
-                  onTap: () => _openCategory(cat), // ← navigate with id
+                  onTap: () => _openCategory(cat),
                   child: _ApiCategoryCard(cat: cat, sw: sw, sh: sh),
                 );
               },
@@ -284,40 +355,67 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── BEST SELLING ──────────────────────────────────────
+  // ── BEST SELLING — API-driven ─────────────────────────
   Widget _buildBestSellingSection(double sw, double sh) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: sw * 0.04),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Best Selling', style: TextStyle(fontSize: sw * 0.045, fontWeight: FontWeight.w700, color: const Color(0xFF1A1A1A))),
+          Text(
+            'Best Selling',
+            style: TextStyle(
+              fontSize: sw * 0.045,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1A1A1A),
+            ),
+          ),
           SizedBox(height: sh * 0.017),
+
           SizedBox(
             height: sh * 0.220,
-            child: ListView(
+            child: _isBestSellingLoading
+
+            // ── Loading shimmer ──
+                ? ListView.separated(
               scrollDirection: Axis.horizontal,
-              children: [
-                SizedBox(width: sw * 0.027),
-                SizedBox(
-                  width: sw * 0.427,
-                  child: _BestSellerCard(
-                    name: 'Solar Wall Light W02', price: 5000, mrp: 7000,
-                    isBestSeller: true, image: 'assets/home/solar_wall.png', sw: sw, sh: sh,
-                    screen: ProductDetailsScreen(productId: 197),
+              itemCount: 3,
+              separatorBuilder: (_, __) => SizedBox(width: sw * 0.02),
+              itemBuilder: (_, __) => _ShimmerBestSellerCard(sw: sw, sh: sh),
+            )
+
+            // ── Empty fallback ──
+                : _bestSellingItems.isEmpty
+                ? Center(
+              child: Text(
+                'No products',
+                style: TextStyle(color: Colors.grey, fontSize: sw * 0.035),
+              ),
+            )
+
+            // ── Real API data ──
+                : ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.only(left: sw * 0.027),
+              itemCount: _bestSellingItems.length,
+              itemBuilder: (ctx, i) {
+                final item = _bestSellingItems[i];
+                // Mark the first item as "Best Seller" badge
+                final isBestSeller = i == 0;
+                return Padding(
+                  padding: EdgeInsets.only(right: sw * 0.02),
+                  child: SizedBox(
+                    width: sw * 0.427,
+                    child: _ApiBestSellerCard(
+                      item: item,
+                      isBestSeller: isBestSeller,
+                      sw: sw,
+                      sh: sh,
+                      onTap: () => _openProductFromItem(item),
+                    ),
                   ),
-                ),
-                SizedBox(width: sw * 0.02),
-                SizedBox(
-                  width: sw * 0.427,
-                  child: _BestSellerCard(
-                    name: 'Solar Wall Light W09', price: 5000, mrp: 7000,
-                    isBestSeller: false, image: 'assets/items/solar_wall_light_2.jpg', sw: sw, sh: sh,
-                    screen: ProductDetailsScreen(productId: 204),
-                  ),
-                ),
-                SizedBox(width: sw * 0.027),
-              ],
+                );
+              },
             ),
           ),
         ],
@@ -333,33 +431,64 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── RECOMMENDED PRODUCTS ──────────────────────────────
+  // ── RECOMMENDED PRODUCTS — API-driven ────────────────
   Widget _buildRecommendedSection(double sw, double sh) {
-    final products = [
-      {'name': 'Solar Wall Light 3', 'mrp': 2000, 'price': 1550, 'unit': 'piece', 'image': 'assets/home/image_1.png', 'productId': 197},
-      {'name': 'Solar Wall Light 3', 'mrp': 2000, 'price': 1000, 'unit': 'piece', 'image': 'assets/home/bollard.png', 'productId': 197},
-      {'name': 'Solar Wall Light 3', 'mrp': 2000, 'price': 1550, 'unit': 'piece', 'image': 'assets/home/image_3.png', 'productId': 197},
-    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: sw * 0.05),
-          child: Text('You Might Also like', style: TextStyle(fontSize: sw * 0.045, fontWeight: FontWeight.w700)),
+          child: Text(
+            'You Might Also like',
+            style: TextStyle(fontSize: sw * 0.045, fontWeight: FontWeight.w700),
+          ),
         ),
         SizedBox(height: sh * 0.02),
+
         SizedBox(
           height: sh * 0.210,
-          child: ListView.builder(
+          child: _isRecommendedLoading
+
+          // ── Loading shimmer ──
+              ? ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.only(left: sw * 0.043),
-            itemCount: products.length,
+            itemCount: 4,
+            separatorBuilder: (_, __) => SizedBox(width: sw * 0.032),
+            itemBuilder: (_, __) => _ShimmerRecommendedCard(sw: sw, sh: sh),
+          )
+
+          // ── Empty fallback ──
+              : _recommendedItems.isEmpty
+              ? Center(
+            child: Text(
+              'No recommendations',
+              style: TextStyle(color: Colors.grey, fontSize: sw * 0.035),
+            ),
+          )
+
+          // ── Real API data ──
+          // RecommendedCard is reused unchanged — we just pass the real
+          // productId (item.id) and productName from the API.
+              : ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.only(left: sw * 0.043),
+            itemCount: _recommendedItems.length,
             itemBuilder: (ctx, i) {
-              final p = products[i];
+              final item = _recommendedItems[i];
               return RecommendedCard(
-                name: p['name'] as String, mrp: p['mrp'] as int,
-                price: p['price'] as int, unit: p['unit'] as String, image: p['image'] as String,
-                productId: p['productId'] as int?,
+                name: item.productName,
+                // price/mrp are not in SubCategoryItemModel — they come
+                // from the product detail API (TYPE 1018).  We show 0
+                // here as a placeholder; the detail screen shows the
+                // real price once the user taps through.
+                mrp: 0,
+                price: 0,
+                unit: 'piece',
+                // Use network image from SubCategoryItemModel when
+                // available; fall back to a placeholder asset.
+                image: item.hasImage ? item.productImage! : '',
+                productId: item.id,   // ← real id from API, same logic as before
               );
             },
           ),
@@ -369,8 +498,241 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// ══════════════════════════════════════════════════════
+//  API BEST SELLER CARD
+//  Mirrors _BestSellerCard but uses SubCategoryItemModel
+//  (network image, real product name, navigates by item.id).
+// ══════════════════════════════════════════════════════
+class _ApiBestSellerCard extends StatefulWidget {
+  final SubCategoryItemModel item;
+  final bool isBestSeller;
+  final VoidCallback onTap;
+  final double sw;
+  final double sh;
+
+  const _ApiBestSellerCard({
+    required this.item,
+    required this.isBestSeller,
+    required this.onTap,
+    required this.sw,
+    required this.sh,
+  });
+
+  @override
+  State<_ApiBestSellerCard> createState() => _ApiBestSellerCardState();
+}
+
+class _ApiBestSellerCardState extends State<_ApiBestSellerCard> {
+  @override
+  Widget build(BuildContext context) {
+    final sw = widget.sw;
+    final sh = widget.sh;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: widget.onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFC8C8C8)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Image area ──
+            SizedBox(
+              height: sh * 0.155,
+              child: Stack(
+                children: [
+                  Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: sh * 0.020),
+                      child: widget.item.hasImage
+                          ? Image.network(
+                        widget.item.productImage!,
+                        height: sh * 0.100,
+                        width: sw * 0.240,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (_, child, progress) =>
+                        progress == null
+                            ? child
+                            : Container(
+                          color: const Color(0xFFF8F8F8),
+                          height: sh * 0.100,
+                          width: sw * 0.240,
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF52B157),
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        ),
+                        errorBuilder: (_, __, ___) => Icon(
+                          Icons.image_not_supported_outlined,
+                          size: sw * 0.12,
+                          color: const Color(0xFFBDBDBD),
+                        ),
+                      )
+                          : Icon(
+                        Icons.image_not_supported_outlined,
+                        size: sw * 0.12,
+                        color: const Color(0xFFBDBDBD),
+                      ),
+                    ),
+                  ),
+
+                  // "Best Seller" badge on first card
+                  if (widget.isBestSeller)
+                    Positioned(
+                      top: 0, left: 0,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: sw * 0.027,
+                          vertical: sh * 0.005,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF4256D3),
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(14),
+                            bottomRight: Radius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          "Best Seller",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: sw * 0.027,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Wishlist heart button
+                  Positioned(
+                    top: sh * 0.008,
+                    right: sw * 0.027,
+                    child: ValueListenableBuilder<List<WishlistItem>>(
+                      valueListenable: wishlistNotifier,
+                      builder: (context, wishlist, _) {
+                        final wItem = WishlistItem(
+                          name: widget.item.productName,
+                          mrp: 0,
+                          price: 0,
+                          unit: 'piece',
+                          image: widget.item.productImage ?? '',
+                        );
+                        final isWishlisted = wishlistNotifier.isWishlisted(wItem);
+                        return GestureDetector(
+                          onTap: () => wishlistNotifier.toggle(wItem),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (child, animation) =>
+                                ScaleTransition(scale: animation, child: child),
+                            child: Icon(
+                              isWishlisted ? Icons.favorite : Icons.favorite_border,
+                              key: ValueKey(isWishlisted),
+                              color: isWishlisted ? Colors.red : const Color(0xFF4256D3),
+                              size: sw * 0.067,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Product name + price placeholder ──
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                sw * 0.027, sh * 0.001, sw * 0.027, sh * 0.010,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.item.productName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: const Color(0xFF4256D3),
+                      fontSize: sw * 0.037,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: sh * 0.005),
+                  // Price is loaded on the detail screen via TYPE 1018.
+                  // Show "View Price" hint to keep the card clean.
+                  Text(
+                    'Tap to view price',
+                    style: TextStyle(
+                      color: const Color(0xFFA8A8A8),
+                      fontSize: sw * 0.029,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  SHIMMER PLACEHOLDERS
+// ══════════════════════════════════════════════════════
+
+class _ShimmerBestSellerCard extends StatelessWidget {
+  final double sw;
+  final double sh;
+  const _ShimmerBestSellerCard({required this.sw, required this.sh});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: sw * 0.427,
+      height: sh * 0.220,
+      margin: EdgeInsets.only(left: sw * 0.027),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEEEEE),
+        borderRadius: BorderRadius.circular(14),
+      ),
+    );
+  }
+}
+
+class _ShimmerRecommendedCard extends StatelessWidget {
+  final double sw;
+  final double sh;
+  const _ShimmerRecommendedCard({required this.sw, required this.sh});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: sw * 0.360,
+      height: sh * 0.210,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEEEEE),
+        borderRadius: BorderRadius.circular(6),
+      ),
+    );
+  }
+}
+
 // ── API CATEGORY CARD ─────────────────────────────────
-// Mirrors the original _CategoryCard but uses network image from the API.
 class _ApiCategoryCard extends StatelessWidget {
   final SideCategoryModel cat;
   final double sw;
@@ -381,7 +743,7 @@ class _ApiCategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: sw * 0.240,             // fixed width so cards are uniform
+      width: sw * 0.240,
       height: sh * 0.123,
       padding: EdgeInsets.symmetric(vertical: sh * 0.015, horizontal: sw * 0.016),
       decoration: BoxDecoration(
@@ -394,7 +756,6 @@ class _ApiCategoryCard extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // ── Category image (network) ──
           SizedBox(
             height: sh * 0.059,
             width: sw * 0.160,
@@ -410,10 +771,7 @@ class _ApiCategoryCard extends StatelessWidget {
             )
                 : Icon(Icons.category_outlined, size: sw * 0.09, color: const Color(0xFF4256D3)),
           ),
-
           SizedBox(height: sh * 0.006),
-
-          // ── Category label ──
           Text(
             cat.label,
             textAlign: TextAlign.center,
@@ -432,7 +790,7 @@ class _ApiCategoryCard extends StatelessWidget {
   }
 }
 
-// ── SHIMMER PLACEHOLDER CARD (while loading) ──────────
+// ── SHIMMER CATEGORY PLACEHOLDER ──────────────────────
 class _ShimmerCategoryCard extends StatelessWidget {
   final double sw;
   final double sh;
@@ -465,130 +823,6 @@ class _HeaderIcon extends StatelessWidget {
       height: sw * 0.096,
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
       child: Icon(icon, color: Colors.white, size: sw * 0.067),
-    );
-  }
-}
-
-// ── BEST SELLER CARD ──────────────────────────────────
-class _BestSellerCard extends StatefulWidget {
-  final String name;
-  final int price;
-  final int mrp;
-  final bool isBestSeller;
-  final String image;
-  final Widget? screen;
-  final double sw;
-  final double sh;
-
-  const _BestSellerCard({
-    required this.name, required this.price, required this.mrp,
-    required this.isBestSeller, required this.image,
-    required this.sw, required this.sh, this.screen,
-  });
-
-  @override
-  State<_BestSellerCard> createState() => _BestSellerCardState();
-}
-
-class _BestSellerCardState extends State<_BestSellerCard> {
-  @override
-  Widget build(BuildContext context) {
-    final sw = widget.sw;
-    final sh = widget.sh;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () {
-        if (widget.screen != null) {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => widget.screen!));
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFC8C8C8)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: sh * 0.155,
-              child: Stack(
-                children: [
-                  Center(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: sh * 0.020),
-                      child: Image.asset(widget.image, height: sh * 0.100, width: sw * 0.240, fit: BoxFit.contain),
-                    ),
-                  ),
-                  if (widget.isBestSeller)
-                    Positioned(
-                      top: 0, left: 0,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: sw * 0.027, vertical: sh * 0.005),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF4256D3),
-                          borderRadius: BorderRadius.only(topLeft: Radius.circular(14), bottomRight: Radius.circular(10)),
-                        ),
-                        child: Text("Best Seller", style: TextStyle(color: Colors.white, fontSize: sw * 0.027, fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                  Positioned(
-                    top: sh * 0.008, right: sw * 0.027,
-                    child: ValueListenableBuilder<List<WishlistItem>>(
-                      valueListenable: wishlistNotifier,
-                      builder: (context, wishlist, _) {
-                        final item = WishlistItem(name: widget.name, mrp: widget.mrp, price: widget.price, unit: 'piece', image: widget.image);
-                        final isWishlisted = wishlistNotifier.isWishlisted(item);
-                        return GestureDetector(
-                          onTap: () => wishlistNotifier.toggle(item),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
-                            child: Icon(
-                              isWishlisted ? Icons.favorite : Icons.favorite_border,
-                              key: ValueKey(isWishlisted),
-                              color: isWishlisted ? Colors.red : const Color(0xFF4256D3),
-                              size: sw * 0.067,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(sw * 0.027, sh * 0.001, sw * 0.027, sh * 0.010),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.name, style: TextStyle(color: const Color(0xFF4256D3), fontSize: sw * 0.037, fontWeight: FontWeight.w600)),
-                  SizedBox(height: sh * 0.005),
-                  Row(
-                    children: [
-                      Text('₹ ', style: TextStyle(fontFamily: 'Lato', fontSize: sw * 0.04, fontWeight: FontWeight.w400)),
-                      Text('${widget.price}', style: TextStyle(fontSize: sw * 0.037, fontWeight: FontWeight.w400)),
-                      SizedBox(width: sw * 0.016),
-                      Text('₹ ', style: TextStyle(fontFamily: 'Lato', fontSize: sw * 0.04, color: const Color(0xFFA8A8A8))),
-                      Text(
-                        '${widget.mrp}',
-                        style: TextStyle(
-                          color: const Color(0xFFA8A8A8), fontSize: sw * 0.032,
-                          decoration: TextDecoration.lineThrough, decorationColor: const Color(0xFFA8A8A8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

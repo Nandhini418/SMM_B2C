@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smm_power/service/product_api_service.dart';
+import 'package:smm_power/service/category_api_service.dart';
 import 'package:smm_power/wishlist_state.dart';
 import 'package:smm_power/cart/order_summary_category.dart';
 import 'package:smm_power/home_screen/recommended.dart';
@@ -32,11 +33,23 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
   int _currentImageIndex = 0;
   late TabController _tabController;
 
+  // ── Recommended API state ─────────────────────────
+  List<SubCategoryItemModel> _recommendedItems = [];
+  bool _isRecommendedLoading = true;
+
+  /// Sub-category id whose products appear in "You might also like".
+  /// Change this to the category id that best fits your recommendations.
+  static const int _recommendedCategoryId = 1;
+
+  /// How many recommended items to show.
+  static const int _recommendedLimit = 6;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadProduct();
+    _loadRecommended();
   }
 
   @override
@@ -45,7 +58,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     super.dispose();
   }
 
-  // ── Fetch ──────────────────────────────────────────
+  // ── Fetch product detail ───────────────────────────
   Future<void> _loadProduct() async {
     setState(() {
       _isLoading = true;
@@ -64,6 +77,23 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         _isLoading = false;
         _error = e.toString();
       });
+    }
+  }
+
+  // ── Fetch recommended products (TYPE 101) ─────────
+  Future<void> _loadRecommended() async {
+    try {
+      final items =
+      await CategoryApiService.fetchSubCategoryItems(_recommendedCategoryId);
+      if (mounted) {
+        setState(() {
+          _recommendedItems = items.take(_recommendedLimit).toList();
+          _isRecommendedLoading = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Recommended load error: $e');
+      if (mounted) setState(() => _isRecommendedLoading = false);
     }
   }
 
@@ -93,8 +123,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
       MaterialPageRoute(
         builder: (_) => Order_Summary_Category(
           source: NavigationSource.buyNow,
-          // Pass the current product as a one-off buy-now item.
-          // This avoids touching the cart and fixes the "empty cart" screen.
           buyNowItem: CartItemModel(
             name: p.productName,
             imagePath: p.productImage,
@@ -142,7 +170,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
   // ── APP BAR ───────────────────────────────────────
   Widget _buildAppBar(double sw, double sh) {
-    // Show pre-fetched name while loading, update once API responds
     final title = _product?.productName ??
         widget.productName ??
         'Product Details';
@@ -289,7 +316,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                               strokeWidth: 2,
                             ),
                           ),
-                          errorBuilder: (_, __, ___) => _noImageBox(sw),
+                          errorBuilder: (_, __, ___) =>
+                              _noImageBox(sw),
                         )
                             : _noImageBox(sw),
                       ),
@@ -422,7 +450,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Name
           Text(
             p.productName,
             style: TextStyle(
@@ -434,7 +461,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
           ),
           SizedBox(height: sh * 0.007),
 
-          // Product code
           if (p.productCode.isNotEmpty)
             Text(
               'Code: ${p.productCode}',
@@ -447,7 +473,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
           SizedBox(height: sh * 0.007),
 
-          // Description short line
           if (p.description.isNotEmpty)
             Text(
               p.description.split('\n').first.trim(),
@@ -460,7 +485,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
           SizedBox(height: sh * 0.010),
 
-          // Price
           Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             Text(
               'Price  ',
@@ -482,7 +506,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
           SizedBox(height: sh * 0.010),
 
-          // Rating (static — you can wire up an API later)
           Row(children: [
             ...List.generate(
               5,
@@ -499,7 +522,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
           SizedBox(height: sh * 0.017),
 
-          // Tags
           Row(children: [
             if (p.taxRate.isNotEmpty)
               Expanded(
@@ -528,7 +550,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
           SizedBox(height: sh * 0.017),
 
-          // Full description
           if (p.description.isNotEmpty)
             Text(
               p.description.trim(),
@@ -687,7 +708,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
           tabs: const [Tab(text: 'Overview'), Tab(text: 'Description')],
         ),
         Divider(height: 0.5, color: Colors.grey[100]),
-        // Overview tab rows (using real API data)
         _infoRow('Product Name', p.productName, sw, sh, isGrey: false),
         _infoRow('Product Code', p.productCode, sw, sh, isGrey: true),
         _infoRow('HSN/SAC Code', p.hsnSacCode, sw, sh),
@@ -791,7 +811,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     );
   }
 
-  // ── RECOMMENDED SECTION ───────────────────────────
+  // ── RECOMMENDED SECTION — API-driven ─────────────
   Widget _buildRecommendedSection(double sw, double sh) {
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -805,36 +825,54 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                 fontSize: sw * 0.043, fontWeight: FontWeight.w700),
           ),
           SizedBox(height: sh * 0.015),
+
           SizedBox(
             height: sh * 0.222,
-            child: ListView(
+            child: _isRecommendedLoading
+
+            // ── Loading shimmer ──
+                ? ListView.separated(
               scrollDirection: Axis.horizontal,
-              children: const [
-                RecommendedCard(
-                  name: 'Flying Crane 1',
-                  mrp: 2000,
-                  price: 1550,
-                  unit: 'piece',
-                  image: 'assets/category/flying_crane_1.png',
-                  productId: 197,
+              itemCount: 4,
+              separatorBuilder: (_, __) =>
+                  SizedBox(width: sw * 0.032),
+              itemBuilder: (_, __) => Container(
+                width: sw * 0.360,
+                height: sh * 0.222,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEEEEE),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                RecommendedCard(
-                  name: 'Flying Crane 2',
-                  mrp: 2000,
-                  price: 1000,
+              ),
+            )
+
+            // ── Empty fallback ──
+                : _recommendedItems.isEmpty
+                ? Center(
+              child: Text(
+                'No recommendations',
+                style: TextStyle(
+                    color: Colors.grey, fontSize: sw * 0.035),
+              ),
+            )
+
+            // ── Real API data — RecommendedCard reused unchanged ──
+                : ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _recommendedItems.length,
+              itemBuilder: (ctx, i) {
+                final item = _recommendedItems[i];
+                return RecommendedCard(
+                  name: item.productName,
+                  mrp: 0,
+                  price: 0,
                   unit: 'piece',
-                  image: 'assets/category/flying_crane_2.png',
-                  productId: 197,
-                ),
-                RecommendedCard(
-                  name: 'Flying Crane 3',
-                  mrp: 2000,
-                  price: 1550,
-                  unit: 'piece',
-                  image: 'assets/category/flying_crane_3.png',
-                  productId: 197,
-                ),
-              ],
+                  image: item.hasImage
+                      ? item.productImage!
+                      : '',
+                  productId: item.id,
+                );
+              },
             ),
           ),
         ],

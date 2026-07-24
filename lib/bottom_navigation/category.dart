@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:smm_power/service/category_api_service.dart';
-import 'package:smm_power/category/product_details.dart'; // <-- import the new details screen
+import 'package:smm_power/category/product_details.dart';
+import 'package:smm_power/category/product_search_screen.dart'; // ← new search screen
+import 'package:smm_power/profile/wish_list.dart';                 // ← wishlist screen
+import 'package:smm_power/cart/cart.dart';                  // ← cart page
 
 // ══════════════════════════════════════════════════════
 //  CATEGORY SCREEN  —  API Bound Version  (with product navigation)
@@ -53,15 +56,18 @@ class _CategoryScreenState extends State<CategoryScreen> {
       final categories = CategoryCache.sideCategories;
       int startIndex = 0;
       if (widget.initialCategoryId != null) {
-        final found = categories.indexWhere((c) => c.id == widget.initialCategoryId);
+        final found =
+        categories.indexWhere((c) => c.id == widget.initialCategoryId);
         if (found != -1) startIndex = found;
       }
       setState(() {
-        _sideCategories    = categories;
+        _sideCategories = categories;
         _selectedSideIndex = startIndex;
-        _isSideLoading     = false;
+        _isSideLoading = false;
       });
-      if (categories.isNotEmpty) _loadSubCategoryItems(categories[startIndex].id);
+      if (categories.isNotEmpty) {
+        _loadSubCategoryItems(categories[startIndex].id);
+      }
       return;
     }
 
@@ -104,9 +110,9 @@ class _CategoryScreenState extends State<CategoryScreen> {
     // ⚡ Cache warm → show instantly, no spinner at all
     if (CategoryCache.isSubCachReady(subCategoryId)) {
       setState(() {
-        _subItems         = CategoryCache.getSubItems(subCategoryId);
+        _subItems = CategoryCache.getSubItems(subCategoryId);
         _isContentLoading = false;
-        _contentError     = null;
+        _contentError = null;
       });
       return;
     }
@@ -141,11 +147,33 @@ class _CategoryScreenState extends State<CategoryScreen> {
       MaterialPageRoute(
         builder: (_) => ProductDetailsScreen(
           productId: item.id,
-          // Pass the product name so the AppBar title is shown
-          // immediately while the API loads — avoids blank title.
           productName: item.productName,
         ),
       ),
+    );
+  }
+
+  // ── Navigate to Search ────────────────────────────────
+  void _openSearch() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ProductSearchScreen()),
+    );
+  }
+
+  // ── Navigate to Wishlist ──────────────────────────────
+  void _openWishlist() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const WishListScreen()),
+    );
+  }
+
+  // ── Navigate to Cart ──────────────────────────────────
+  void _openCart() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CartPage()),
     );
   }
 
@@ -162,7 +190,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
               padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius:
+                BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -188,7 +217,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   _buildSortTile("Discount", 1, setModalState),
                   _buildSortTile("Price (lowest first)", 2, setModalState),
                   _buildSortTile("Whats New", 3, setModalState),
-                  _buildSortTile("Price (Highest first)", 4, setModalState),
+                  _buildSortTile(
+                      "Price (Highest first)", 4, setModalState),
                   _buildSortTile("Ratings", 5, setModalState),
                   const SizedBox(height: 10),
                 ],
@@ -200,7 +230,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
     );
   }
 
-  Widget _buildSortTile(String title, int index, Function setModalState) {
+  Widget _buildSortTile(
+      String title, int index, Function setModalState) {
     return InkWell(
       onTap: () {
         setModalState(() => _selectedSortIndex = index);
@@ -263,7 +294,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
           ),
           child: SafeArea(
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: sw * 0.032),
+              padding:
+              EdgeInsets.symmetric(horizontal: sw * 0.032),
               child: Row(
                 children: [
                   IconButton(
@@ -289,20 +321,23 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   const Spacer(),
                   Row(
                     children: [
+                      // ── Search ──
                       GestureDetector(
-                        onTap: () {},
+                        onTap: _openSearch,
                         child: Icon(Icons.search,
                             size: sw * 0.06, color: Colors.black),
                       ),
                       SizedBox(width: sw * 0.03),
+                      // ── Wishlist ──
                       GestureDetector(
-                        onTap: () {},
+                        onTap: _openWishlist,
                         child: Icon(Icons.favorite_border,
                             size: sw * 0.06, color: Colors.black),
                       ),
                       SizedBox(width: sw * 0.03),
+                      // ── Cart ──
                       GestureDetector(
-                        onTap: () {},
+                        onTap: _openCart,
                         child: Icon(Icons.shopping_cart_outlined,
                             size: sw * 0.06, color: Colors.black),
                       ),
@@ -359,7 +394,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
               _loadSubCategoryItems(cat.id);
             },
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              duration:
+              const Duration(milliseconds: 180),
               decoration: BoxDecoration(
                 color: isSelected
                     ? Colors.white
@@ -380,7 +416,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 horizontal: sw * 0.021,
               ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment:
+                MainAxisAlignment.center,
                 children: [
                   Container(
                     width: sw * 0.139,
@@ -394,7 +431,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
                           color: Colors.black
                               .withOpacity(0.10),
                           blurRadius: 6,
-                          offset: const Offset(0, 2),
+                          offset:
+                          const Offset(0, 2),
                         ),
                       ]
                           : [],
@@ -404,16 +442,19 @@ class _CategoryScreenState extends State<CategoryScreen> {
                           ? Image.network(
                         cat.image,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Icon(
-                          Icons.category,
-                          size: sw * 0.07,
-                          color: const Color(0xFF4256D3),
-                        ),
+                        errorBuilder: (_, __, ___) =>
+                            Icon(
+                              Icons.category,
+                              size: sw * 0.07,
+                              color: const Color(
+                                  0xFF4256D3),
+                            ),
                       )
                           : Icon(
                         Icons.category,
                         size: sw * 0.07,
-                        color: const Color(0xFF4256D3),
+                        color: const Color(
+                            0xFF4256D3),
                       ),
                     ),
                   ),
@@ -445,12 +486,14 @@ class _CategoryScreenState extends State<CategoryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, color: Colors.red, size: sw * 0.08),
+          Icon(Icons.error_outline,
+              color: Colors.red, size: sw * 0.08),
           const SizedBox(height: 6),
           Text(
             'Failed to load',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: sw * 0.027, color: Colors.red),
+            style:
+            TextStyle(fontSize: sw * 0.027, color: Colors.red),
           ),
           const SizedBox(height: 6),
           GestureDetector(
@@ -474,7 +517,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
       child: Text(
         'No categories',
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: sw * 0.027, color: Colors.grey),
+        style:
+        TextStyle(fontSize: sw * 0.027, color: Colors.grey),
       ),
     );
   }
@@ -498,13 +542,15 @@ class _CategoryScreenState extends State<CategoryScreen> {
                     vertical: sh * 0.006,
                   ),
                   decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFF4256D3)),
+                    border:
+                    Border.all(color: const Color(0xFF4256D3)),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(
                     children: [
                       Icon(Icons.swap_vert,
-                          size: sw * 0.045, color: const Color(0xFF4256D3)),
+                          size: sw * 0.045,
+                          color: const Color(0xFF4256D3)),
                       SizedBox(width: sw * 0.01),
                       Text(
                         "Sort By",
@@ -538,7 +584,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 SizedBox(width: sw * 0.021),
                 Expanded(
                   child: Container(
-                      height: 1, color: const Color(0xFF868282)),
+                      height: 1,
+                      color: const Color(0xFF868282)),
                 ),
               ],
             ),
@@ -571,11 +618,13 @@ class _CategoryScreenState extends State<CategoryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, color: Colors.red, size: sw * 0.12),
+          Icon(Icons.error_outline,
+              color: Colors.red, size: sw * 0.12),
           const SizedBox(height: 8),
           Text(
             'Failed to load items',
-            style: TextStyle(fontSize: sw * 0.037, color: Colors.red),
+            style: TextStyle(
+                fontSize: sw * 0.037, color: Colors.red),
           ),
           const SizedBox(height: 8),
           ElevatedButton(
@@ -608,8 +657,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
             const SizedBox(height: 10),
             Text(
               'No items found',
-              style:
-              TextStyle(fontSize: sw * 0.04, color: Colors.grey),
+              style: TextStyle(
+                  fontSize: sw * 0.04, color: Colors.grey),
             ),
           ],
         ),
@@ -630,7 +679,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
         childAspectRatio: 0.80,
       ),
       itemBuilder: (ctx, i) => GestureDetector(
-        onTap: () => _openProductDetail(items[i]),   // ← NAVIGATE on tap
+        onTap: () => _openProductDetail(items[i]),
         child: _SubCategoryItemCard(
           item: items[i],
           sw: sw,
@@ -678,9 +727,11 @@ class _SubCategoryItemCard extends StatelessWidget {
             child: Image.network(
               item.productImage!,
               fit: BoxFit.cover,
-              loadingBuilder: (_, child, progress) => progress == null
+              loadingBuilder: (_, child, progress) =>
+              progress == null
                   ? child
-                  : Container(color: const Color(0xFFEEEEEE)),
+                  : Container(
+                  color: const Color(0xFFEEEEEE)),
               errorBuilder: (_, __, ___) => Center(
                 child: Icon(
                   Icons.image_not_supported_outlined,

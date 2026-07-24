@@ -48,6 +48,11 @@ class RecommendedCardState extends State<RecommendedCard> {
 
   void _onWishlistChanged() => setState(() {});
 
+  /// Returns true when [image] is a network URL (http/https).
+  /// Returns false for local asset paths.
+  bool get _isNetworkImage =>
+      widget.image.startsWith('http://') || widget.image.startsWith('https://');
+
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -112,11 +117,45 @@ class RecommendedCardState extends State<RecommendedCard> {
               ),
             ),
 
-            // ── PRODUCT IMAGE ──
+            // ── PRODUCT IMAGE — asset or network ──
             Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: sh * 0.000),
-                child: Image.asset(
+                child: widget.image.isEmpty
+                    ? SizedBox(
+                  height: sh * 0.086,
+                  child: Center(
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      size: sw * 0.10,
+                      color: const Color(0xFFBDBDBD),
+                    ),
+                  ),
+                )
+                    : _isNetworkImage
+                    ? Image.network(
+                  widget.image,
+                  height: sh * 0.086,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (_, child, progress) =>
+                  progress == null
+                      ? child
+                      : SizedBox(
+                    height: sh * 0.086,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF52B157),
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                  errorBuilder: (_, __, ___) => Icon(
+                    Icons.image_not_supported_outlined,
+                    size: sw * 0.10,
+                    color: const Color(0xFFBDBDBD),
+                  ),
+                )
+                    : Image.asset(
                   widget.image,
                   height: sh * 0.086,
                   fit: BoxFit.contain,
